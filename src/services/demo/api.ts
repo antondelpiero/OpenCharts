@@ -1,5 +1,15 @@
 import type { DrawingLine } from "../../pages/trading/constants.ts";
+import type { accountsApi } from "../api/accounts.ts";
+import type {
+  CreateJournalEntryInput,
+  JournalEntriesResponse,
+  UpdateJournalEntryInput,
+} from "../api/journal.ts";
+import type { MarketDataCandlesPayload } from "../api/market-data.ts";
 import type { Candle } from "../schemas.ts";
+
+/** The real endpoint's payload, so the demo stub can't drift from its shape. */
+type ReplaySessionResponse = Awaited<ReturnType<typeof accountsApi.replayGetSession>>;
 import { getHistory } from "./candles.ts";
 import * as engine from "./engine.ts";
 import { DEMO_SYMBOLS } from "./instruments.ts";
@@ -59,8 +69,13 @@ const chartDrawings = {
   },
 };
 
-const candlesMeta = (candles: Candle[]) => ({
-  candles,
+/**
+ * Wrap demo candles in the real endpoint's payload shape. `Candle.timestamp` is
+ * optional in the schema but required by `MarketDataCandle`, so derive it from
+ * `time` (seconds → ms) rather than leaving consumers to guess.
+ */
+const candlesMeta = (candles: Candle[]): MarketDataCandlesPayload => ({
+  candles: candles.map((c) => ({ ...c, timestamp: c.timestamp ?? c.time * 1000 })),
   metadata: { isPartial: false, backfillQueued: false, historicalCoverageStart: null },
 });
 
@@ -129,8 +144,24 @@ export const demoApi = {
 
   // ── Symbols & market data ──
   getSymbols: () => Promise.resolve(DEMO_SYMBOLS),
-  getCandles: (symbol: string, timeframe: string, limit?: number) =>
-    Promise.resolve(getHistory(symbol, timeframe, limit)),
+  /**
+   * `range` backs the chart's "load more history" scroll: ChartPanel asks for
+   * an explicit window rather than a bar count. Honour it by slicing the demo
+   * series to that window — ignoring it would return the same recent bars and
+   * leave the chart appearing to have no earlier history.
+   */
+  getCandles: (
+    symbol: string,
+    timeframe: string,
+    limit?: number,
+    range?: { fromMs: number; toMs: number },
+  ) => {
+    const bars = getHistory(symbol, timeframe, range ? undefined : limit);
+    if (!range) return Promise.resolve(bars);
+    const fromSec = range.fromMs / 1000;
+    const toSec = range.toMs / 1000;
+    return Promise.resolve(bars.filter((c) => c.time >= fromSec && c.time <= toSec));
+  },
   getCandlesWithMeta: (symbol: string, timeframe: string, limit?: number) =>
     Promise.resolve(candlesMeta(getHistory(symbol, timeframe, limit))),
   getTick: (symbol: string) => {
@@ -143,7 +174,10 @@ export const demoApi = {
   // ── Trading (paper engine) ──
   placeOrder: (data: engine.PlaceOrderArgs) => Promise.resolve(engine.placeOrder(data)),
   cancelOrder: (orderId: string) => Promise.resolve(engine.cancelOrder(orderId)),
-  modifyOrder: (orderId: string) => Promise.resolve(engine.getOrders().find((o) => o.id === orderId)),
+  modifyOrder: (
+    orderId: string,
+    modifications: Parameters<typeof engine.modifyOrder>[1] = {},
+  ) => Promise.resolve(engine.modifyOrder(orderId, modifications)),
   cancelAllOrders: () => Promise.resolve({ success: true }),
   getOrders: () => Promise.resolve(engine.getOrders()),
   getPositions: () => Promise.resolve(engine.getPositions()),
@@ -160,9 +194,14 @@ export const demoApi = {
   getFillQuality: () => Promise.resolve([]),
 
   // ── Trade journal (localStorage-free demo: empty) ──
-  getJournalEntries: () => Promise.resolve([]),
-  createJournalEntry: () => Promise.resolve(null),
-  updateJournalEntry: () => Promise.resolve(null),
+  // Shape matches JournalEntriesResponse — TradingPage reads `.entries`.
+  getJournalEntries: (): Promise<JournalEntriesResponse> =>
+    Promise.resolve({ entries: [], total: 0 }),
+  // Declare the real inputs: callers derive their mutation variables from these
+  // signatures (`Parameters<typeof api.createJournalEntry>`), so dropping the
+  // parameters here would type those variables as `unknown`.
+  createJournalEntry: (_data: CreateJournalEntryInput) => Promise.resolve(null),
+  updateJournalEntry: (_id: string, _data: UpdateJournalEntryInput) => Promise.resolve(null),
   deleteJournalEntry: () => Promise.resolve({ success: true }),
 
   // ── Chart persistence ──
@@ -171,8 +210,32 @@ export const demoApi = {
 
   // ── Feature gating / misc (terminal reads these on mount) ──
   getFeatureFlags: () => Promise.resolve({}),
-  isAiTraderEnabled: () => Promise.resolve(false),
+  // Callers read `.enabled` off this (TradingPage), so return the flag object
+  // rather than a bare boolean. The AI trader has no demo implementation.
+  isAiTraderEnabled: () => Promise.resolve({ enabled: false }),
   getAnnouncements: () => Promise.resolve([]),
   getAnnouncementsUnreadCount: () => Promise.resolve(0),
-  replayGetSession: () => Promise.resolve(null),
+  /**
+   * Session replay needs recorded per-account 1m history, which the demo has
+   * no source for. Resolve to a correctly-shaped *empty* session rather than
+   * `null`: the replay hooks read `tickBuffer`/`meta`/`tradeEvents` off this
+   * value, and an empty buffer is exactly the "nothing recorded" case they
+   * already handle — they surface "Replay unavailable" and stop playback.
+   */
+  replayGetSession: (
+    _accountId?: string,
+    sessionDate?: string,
+  ): Promise<ReplaySessionResponse> =>
+    Promise.resolve({
+      replaySession: {
+        id: "demo-replay",
+        status: "stopped",
+        speed: 1,
+        cursorTimestamp: null,
+        sessionDate: sessionDate ?? "",
+      },
+      tickBuffer: [],
+      tradeEvents: [],
+      meta: { primarySymbol: null, sessionDate: sessionDate ?? "", tickCount: 0 },
+    }),
 };

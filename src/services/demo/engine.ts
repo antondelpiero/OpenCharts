@@ -241,6 +241,31 @@ export function modifyPosition(
   return { ...pos };
 }
 
+/**
+ * Apply an edit to a working (pending) order. Mirrors `modifyPosition`: only
+ * the fields the caller actually supplied are touched, so clearing TP/SL with
+ * an explicit `null` is distinct from leaving them alone (`undefined`).
+ */
+export function modifyOrder(
+  orderId: string,
+  mods: {
+    price?: number;
+    quantity?: number;
+    takeProfit?: number | null;
+    stopLoss?: number | null;
+  },
+): Order | undefined {
+  const order = orders.find((o) => o.id === orderId);
+  if (!order) return undefined;
+  if (mods.price !== undefined) order.price = mods.price;
+  if (mods.quantity !== undefined) order.quantity = mods.quantity;
+  if (mods.takeProfit !== undefined) order.takeProfit = mods.takeProfit;
+  if (mods.stopLoss !== undefined) order.stopLoss = mods.stopLoss;
+  order.updatedAt = new Date().toISOString();
+  publish("orders", { eventType: "OrderUpdated", accountId: account.id, orderId });
+  return { ...order };
+}
+
 export function cancelOrder(orderId: string): { success: boolean } {
   const idx = orders.findIndex((o) => o.id === orderId);
   if (idx >= 0) orders.splice(idx, 1);

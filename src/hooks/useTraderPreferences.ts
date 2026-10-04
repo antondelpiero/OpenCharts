@@ -54,9 +54,9 @@ export function useTraderPreferences() {
 
     api
       .getPreferences()
-      .then((serverPrefs) => {
+      .then((serverPrefs: unknown) => {
         if (serverPrefs && typeof serverPrefs === "object") {
-          const merged = { ...serverPrefs, ...local };
+          const merged = { ...(serverPrefs as TraderPrefs), ...local };
           setPrefs(merged);
           writeTraderPrefs(merged, userId);
           applyAccentColorFromPrefs(merged);

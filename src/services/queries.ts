@@ -170,7 +170,9 @@ export function useClosedPositionsSummary(
   from: string | null,
   to: string | null,
 ) {
-  return useQuery<{ pnl: number; commission: number; swap: number; tradeCount: number }>({
+  // Shape follows the demo/stub implementation rather than a hand-written
+  // prop-firm payload, so the two cannot drift apart.
+  return useQuery<Awaited<ReturnType<typeof api.getClosedPositionsSummary>>>({
     queryKey: ["closedPositionsSummary", accountId, from, to] as const,
     queryFn: () => api.getClosedPositionsSummary(accountId!, from!, to!),
     enabled: !!(accountId && from && to),
@@ -181,20 +183,7 @@ export function useClosedPositionsSummary(
 
 // ── Fill Quality Score ─────────────────────────────────
 export function useFillQuality(accountId: string | null) {
-  return useQuery<{
-    avgScore: number | null;
-    count: number;
-    entries: Array<{
-      id: string;
-      symbol: string;
-      side: string;
-      slippageBps: number;
-      latencyMs: number;
-      integrityCoupled: boolean;
-      qualityScore: number | null;
-      createdAt: string;
-    }>;
-  }>({
+  return useQuery<Awaited<ReturnType<typeof api.getFillQuality>>>({
     queryKey: ["fillQuality", accountId] as const,
     queryFn: () => api.getFillQuality(accountId!),
     enabled: !!accountId,
@@ -204,7 +193,10 @@ export function useFillQuality(accountId: string | null) {
 
 // ── Payout Queries ─────────────────────────────────────
 export function useAllPayouts() {
-  return useQuery<AllPayoutsResponse>({
+  // getAllPayouts has no demo implementation (see LegacyApi in services/api):
+  // it resolves to null, so the result is typed as nullable rather than
+  // claiming a payload the terminal never receives.
+  return useQuery<AllPayoutsResponse | null>({
     queryKey: ["allPayouts"],
     queryFn: () => api.getAllPayouts(),
     staleTime: 15_000,
@@ -769,11 +761,13 @@ export function useCreateAiTraderPlan() {
         readOnlyMode?: boolean;
       };
     }) => api.createAiTraderPlan(data),
-    onSuccess: (result, vars) => {
+    onSuccess: (result: { autoExecuted?: boolean } | null, vars) => {
       qc.invalidateQueries({
         queryKey: ["ai-trader", "history", vars.accountId],
       });
-      // If auto-executed, also refresh trading data
+      // If auto-executed, also refresh trading data. createAiTraderPlan has no
+      // demo implementation (see LegacyApi in services/api) and resolves to
+      // null, so this branch stays dormant until a real backend is wired in.
       if (result?.autoExecuted) {
         qc.invalidateQueries({
           queryKey: queryKeys.trading.positions(vars.accountId),
@@ -1107,8 +1101,10 @@ export function useDailyPnl(
   accountIds: string[],
   from: string,
   to: string,
-): ReturnType<typeof useQuery<PnlCalendarResponse>> {
-  return useQuery<PnlCalendarResponse>({
+): ReturnType<typeof useQuery<PnlCalendarResponse | null>> {
+  // getDailyPnl has no demo implementation (see LegacyApi in services/api):
+  // it resolves to null, so the calendar payload is nullable here.
+  return useQuery<PnlCalendarResponse | null>({
     queryKey: ["daily-pnl", accountIds.slice().sort().join(","), from, to],
     queryFn: () => api.getDailyPnl(accountIds, from, to),
     enabled: accountIds.length > 0 && !!from && !!to,
