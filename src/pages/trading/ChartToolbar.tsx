@@ -38,7 +38,11 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { INDICATOR_REGISTRY, type IndicatorType } from "../../lib/indicators.ts";
+import {
+  INDICATOR_REGISTRY,
+  type IndicatorInstance,
+  type IndicatorType,
+} from "../../lib/indicators.ts";
 import { cn, formatNumber } from "../../lib/utils.ts";
 import {
   type DrawingLine,
@@ -67,8 +71,9 @@ export interface ChartToolbarProps {
   onSymbolChange: (s: string) => void;
   timeframe: Timeframe;
   onTimeframeChange: (tf: Timeframe) => void;
-  activeIndicators: IndicatorType[];
-  onToggleIndicator: (type: IndicatorType) => void;
+  activeIndicators: IndicatorInstance[];
+  /** Each click adds another instance of `type` — the menu is not a toggle. */
+  onAddIndicator: (type: IndicatorType) => void;
   showIndicatorMenu: boolean;
   onToggleIndicatorMenu: () => void;
   drawingTool: DrawingTool;
@@ -98,7 +103,7 @@ export interface ChartToolbarProps {
   activePlugins?: string[];
   onTogglePlugin?: (id: string) => void;
   /** Replace the full indicator list (template load). Enables the templates menu. */
-  onSetIndicators?: (indicators: IndicatorType[]) => void;
+  onSetIndicators?: (indicators: IndicatorInstance[]) => void;
   /** Replace the full plugin list (template load). Enables the templates menu. */
   onSetPlugins?: (ids: string[]) => void;
   magnetMode?: MagnetMode;
@@ -114,7 +119,7 @@ export function ChartToolbar({
   timeframe,
   onTimeframeChange,
   activeIndicators,
-  onToggleIndicator,
+  onAddIndicator,
   showIndicatorMenu,
   onToggleIndicatorMenu,
   drawingTool,
@@ -349,17 +354,20 @@ export function ChartToolbar({
               {INDICATOR_REGISTRY.map((ind) => (
                 <button
                   key={ind.type}
-                  onClick={() => onToggleIndicator(ind.type)}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-secondary text-left",
-                    activeIndicators.includes(ind.type) && "bg-secondary",
-                  )}
+                  onClick={() => onAddIndicator(ind.type)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-secondary text-left"
+                  title={`Add ${ind.label}`}
                 >
                   <span
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: ind.color }}
                   />
                   <span className="flex-1">{ind.label}</span>
+                  {activeIndicators.some((i) => i.type === ind.type) && (
+                    <span className="text-[10px] text-primary">
+                      ×{activeIndicators.filter((i) => i.type === ind.type).length}
+                    </span>
+                  )}
                   <span className="text-[10px] text-muted-foreground">{ind.pane}</span>
                 </button>
               ))}

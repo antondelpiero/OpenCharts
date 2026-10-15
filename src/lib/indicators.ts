@@ -329,3 +329,63 @@ export const INDICATOR_REGISTRY: IndicatorConfig[] = [
     color: "#42a5f5",
   },
 ];
+
+// ── Indicator Instances ──────────────────────────────────────
+/**
+ * A single configured indicator on the chart.
+ *
+ * Indicators are instances rather than on/off flags so the same type can appear
+ * several times with different settings — the common case being a moving-average
+ * ribbon (EMA 50 / 100 / 200). `id` is what the chart series, the legend and the
+ * edit popup all key off; `type` alone is not unique.
+ */
+export interface IndicatorInstance {
+  id: string;
+  type: IndicatorType;
+  /** Copied from the registry defaults on creation, then edited per instance. */
+  params: Record<string, number>;
+  /** Per-instance line color, so duplicates of one type stay distinguishable. */
+  color: string;
+}
+
+/**
+ * Palette cycled through when adding repeats of the same indicator type. The
+ * first instance keeps the registry's own color so single-indicator charts look
+ * unchanged; later ones step through these.
+ */
+const INSTANCE_COLORS = [
+  "#f0b90b",
+  "#e377c2",
+  "#26a69a",
+  "#42a5f5",
+  "#ab47bc",
+  "#ff7043",
+  "#8884d8",
+  "#66bb6a",
+];
+
+let instanceCounter = 0;
+
+/** Build a new instance of `type`, seeded with the registry's default params. */
+export function createIndicatorInstance(
+  type: IndicatorType,
+  existing: readonly IndicatorInstance[] = [],
+): IndicatorInstance {
+  const config = INDICATOR_REGISTRY.find((r) => r.type === type);
+  const sameType = existing.filter((i) => i.type === type).length;
+  return {
+    id: `${type}-${Date.now().toString(36)}-${(instanceCounter++).toString(36)}`,
+    type,
+    params: { ...(config?.defaultParams ?? {}) },
+    color:
+      sameType === 0
+        ? (config?.color ?? INSTANCE_COLORS[0]!)
+        : INSTANCE_COLORS[sameType % INSTANCE_COLORS.length]!,
+  };
+}
+
+/** Human label for a legend row — "EMA 50", "MACD 12/26/9", "VWAP". */
+export function describeIndicator(instance: IndicatorInstance): string {
+  const values = Object.values(instance.params);
+  return values.length === 0 ? instance.type : `${instance.type} ${values.join("/")}`;
+}

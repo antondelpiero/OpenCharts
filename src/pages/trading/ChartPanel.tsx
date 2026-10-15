@@ -11,6 +11,7 @@ import {
   type ISeriesPrimitive,
   LineStyle,
   type LogicalRange,
+  type MouseEventParams,
   type SeriesMarker,
   type Time,
 } from "lightweight-charts";
@@ -37,7 +38,7 @@ import { CrosshairHighlightPrimitive } from "../../lib/chart-plugins/highlight-b
 import { SessionBreaks } from "../../lib/chart-plugins/session-breaks/session-breaks.ts";
 import { SessionHighlighting } from "../../lib/chart-plugins/session-highlighting/session-highlighting.ts";
 import { TooltipPrimitive } from "../../lib/chart-plugins/tooltip/tooltip.ts";
-import type { IndicatorType } from "../../lib/indicators.ts";
+import type { IndicatorInstance } from "../../lib/indicators.ts";
 import { cn } from "../../lib/utils.ts";
 import { api } from "../../services/api.ts";
 import { queryKeys } from "../../services/queries.ts";
@@ -53,6 +54,7 @@ import {
   type Timeframe,
 } from "./constants.ts";
 import { ChartContextMenu } from "./ChartContextMenu.tsx";
+import { IndicatorEditPopup, IndicatorLegend } from "./IndicatorLegend.tsx";
 import { ChartSettingsDialog } from "./ChartSettingsDialog.tsx";
 import {
   DrawingContextMenu,
@@ -64,7 +66,7 @@ import { DRAWING_STYLES_EVENT, getStyleDefaults } from "./drawingStyles.ts";
 import { NewsOverlay } from "./NewsOverlay.tsx";
 import { ObjectTreePanel } from "./ObjectTreePanel.tsx";
 import { useChallengeLevels } from "./useChallengeLevels.ts";
-import { useIndicators } from "./useIndicators.ts";
+import { useIndicators, type IndicatorSeriesIndex } from "./useIndicators.ts";
 import { useNewsOverlay } from "./useNewsOverlay.ts";
 import { useSlTpDrag } from "./useSlTpDrag.ts";
 import {
@@ -198,7 +200,10 @@ export interface ChartPanelProps {
   selectedSymbol: string;
   timeframe: Timeframe;
   isDark: boolean;
-  activeIndicators: IndicatorType[];
+  activeIndicators: IndicatorInstance[];
+  /** Apply edited params to one indicator instance. */
+  onUpdateIndicator?: (id: string, params: Record<string, number>) => void;
+  onRemoveIndicator?: (id: string) => void;
   drawingTool: DrawingTool;
   drawings: DrawingLine[];
   onAddDrawing: (d: DrawingLine) => void;
@@ -1075,6 +1080,8 @@ export function ChartPanel({
   timeframe,
   isDark,
   activeIndicators,
+  onUpdateIndicator,
+  onRemoveIndicator,
   drawingTool,
   drawings,
   onAddDrawing,
@@ -1389,7 +1396,61 @@ export function ChartPanel({
     [onAddDrawing, pipDigits, timeframe, selectedSymbol],
   );
 
-  useIndicators(chartRef, candleSeriesRef, chartData, activeIndicators, isDark);
+  // ── Indicator legend / edit popup ──────────────────────────
+  // Series→instance index, rebuilt whenever useIndicators redraws, so a click
+  // on a plotted line can be resolved back to the instance that drew it.
+  const indicatorSeriesIndexRef = useRef<IndicatorSeriesIndex>(new Map());
+  const [indicatorMenu, setIndicatorMenu] = useState<{
+    instance: IndicatorInstance;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleSeriesIndex = useCallback((index: IndicatorSeriesIndex) => {
+    indicatorSeriesIndexRef.current = index;
+  }, []);
+
+  useIndicators(
+    chartRef,
+    candleSeriesRef,
+    chartData,
+    activeIndicators,
+    isDark,
+    handleSeriesIndex,
+  );
+
+  // Clicking a plotted indicator line opens the same popup as its legend row.
+  // lightweight-charts reports every series with a value at the clicked time,
+  // so pick whichever is nearest the cursor in price terms and require it to be
+  // within a few pixels — otherwise an ordinary chart click would open a popup.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const handler = (param: MouseEventParams<Time>) => {
+      if (!param.point || !param.seriesData) return;
+      const index = indicatorSeriesIndexRef.current;
+      if (index.size === 0) return;
+
+      let best: { instance: IndicatorInstance; dist: number } | null = null;
+      for (const [series, instance] of index) {
+        const data = param.seriesData.get(series) as { value?: number } | undefined;
+        if (typeof data?.value !== "number") continue;
+        const y = series.priceToCoordinate(data.value);
+        if (y == null) continue;
+        const dist = Math.abs(y - param.point.y);
+        if (!best || dist < best.dist) best = { instance, dist };
+      }
+      if (best && best.dist <= 6) {
+        setIndicatorMenu({
+          instance: best.instance,
+          x: param.point.x + (containerRef.current?.getBoundingClientRect().left ?? 0),
+          y: param.point.y + (containerRef.current?.getBoundingClientRect().top ?? 0),
+        });
+      }
+    };
+    chart.subscribeClick(handler);
+    return () => chart.unsubscribeClick(handler);
+  }, [chartData.length]);
 
   // ── Replay trade event markers ─────────────────────────────
   useEffect(() => {
@@ -2070,6 +2131,24 @@ export function ChartPanel({
 
       {/* Chart container — cursor is managed imperatively by DrawingToolsManager */}
       <div ref={containerRef} className="w-full h-full" onContextMenu={handleChartContextMenu} />
+
+      {/* Active indicator rows — the reliable click target for edit/remove */}
+      <IndicatorLegend
+        instances={activeIndicators}
+        onSelect={(instance, x, y) => setIndicatorMenu({ instance, x, y })}
+        onRemove={(id) => onRemoveIndicator?.(id)}
+      />
+
+      {indicatorMenu && (
+        <IndicatorEditPopup
+          instance={indicatorMenu.instance}
+          x={indicatorMenu.x}
+          y={indicatorMenu.y}
+          onApply={(id, params) => onUpdateIndicator?.(id, params)}
+          onRemove={(id) => onRemoveIndicator?.(id)}
+          onClose={() => setIndicatorMenu(null)}
+        />
+      )}
 
       {/* Left vertical tool rail (TradingView-style grouped flyouts) */}
       <DrawingToolRail drawingTool={drawingTool} onDrawingTool={(t) => onDrawingToolSelect?.(t)} />

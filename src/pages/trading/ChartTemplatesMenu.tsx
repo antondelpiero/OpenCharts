@@ -7,7 +7,11 @@ import {
   updateChartPreferences,
   useChartPreferences,
 } from "../../hooks/useChartPreferences.ts";
-import type { IndicatorType } from "../../lib/indicators.ts";
+import {
+  createIndicatorInstance,
+  type IndicatorInstance,
+  type IndicatorType,
+} from "../../lib/indicators.ts";
 import { cn } from "../../lib/utils.ts";
 import {
   type ChartTemplate,
@@ -25,22 +29,51 @@ import { toast } from "../../services/toast.ts";
 const AUTOSAVE_DEBOUNCE_MS = 1_500;
 
 export interface ChartTemplatesMenuProps {
-  activeIndicators: IndicatorType[];
-  onSetIndicators: (indicators: IndicatorType[]) => void;
+  activeIndicators: IndicatorInstance[];
+  onSetIndicators: (indicators: IndicatorInstance[]) => void;
   activePlugins: string[];
   onSetPlugins: (ids: string[]) => void;
 }
 
 function snapshotContent(
   prefs: ChartPreferences,
-  indicators: IndicatorType[],
+  indicators: IndicatorInstance[],
   plugins: string[],
 ): ChartTemplateContent {
   const snapshot: Record<string, string | boolean> = {};
   for (const key of TEMPLATE_PREF_KEYS) {
     snapshot[key] = prefs[key];
   }
-  return { version: 1, prefs: snapshot, indicators, plugins };
+  return {
+    version: 1,
+    prefs: snapshot,
+    // Persist without the runtime `id` — it is re-minted on load.
+    indicators: indicators.map(({ type, params, color }) => ({ type, params, color })),
+    plugins,
+  };
+}
+
+/**
+ * Normalise a stored indicator list into live instances.
+ *
+ * v1 templates stored bare type names; those become a single default instance
+ * per type. Newer templates store `{type, params, color}` objects, which are
+ * restored as-is apart from a freshly minted id.
+ */
+function contentToIndicators(
+  stored: ChartTemplateContent["indicators"] | undefined,
+): IndicatorInstance[] {
+  const out: IndicatorInstance[] = [];
+  for (const entry of stored ?? []) {
+    const type = (typeof entry === "string" ? entry : entry.type) as IndicatorType;
+    const instance = createIndicatorInstance(type, out);
+    if (typeof entry !== "string") {
+      instance.params = { ...instance.params, ...entry.params };
+      if (entry.color) instance.color = entry.color;
+    }
+    out.push(instance);
+  }
+  return out;
 }
 
 function contentToPrefsPatch(content: ChartTemplateContent): Partial<ChartPreferences> {
@@ -265,7 +298,7 @@ export function ChartTemplatesMenu(props: ChartTemplatesMenuProps) {
     const c = t.panels[0];
     if (!c) return;
     updateChartPreferences({ ...contentToPrefsPatch(c), activeChartTemplate: t.name });
-    onSetIndicators((c.indicators ?? []) as IndicatorType[]);
+    onSetIndicators(contentToIndicators(c.indicators));
     onSetPlugins(c.plugins ?? []);
     setOpen(false);
     toast.info("Templates", `Loaded "${t.name}"`);

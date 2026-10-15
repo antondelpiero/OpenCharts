@@ -1,10 +1,22 @@
 // Chart templates persist to localStorage in demo mode (no backend).
 
+/** An indicator instance as persisted in a template (ids are re-minted on load). */
+export interface StoredIndicatorInstance {
+  type: string;
+  params: Record<string, number>;
+  color?: string;
+}
+
 export interface ChartTemplateContent {
   version: 1;
   /** Snapshot of the TEMPLATE_PREF_KEYS subset of ChartPreferences. */
   prefs: Record<string, string | boolean>;
-  indicators: string[];
+  /**
+   * v1 templates stored bare type names (`["EMA","RSI"]`). Indicators are now
+   * configurable instances, so new templates store those objects instead; both
+   * forms are accepted here and normalised on load (see ChartTemplatesMenu).
+   */
+  indicators: Array<string | StoredIndicatorInstance>;
   plugins: string[];
 }
 

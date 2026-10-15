@@ -16,7 +16,7 @@ import {
   useChartPreferences,
 } from "../hooks/useChartPreferences.ts";
 import { useTradeSound } from "../hooks/useTradeSound";
-import type { IndicatorType } from "../lib/indicators.ts";
+import { createIndicatorInstance, type IndicatorInstance } from "../lib/indicators.ts";
 import { posthog } from "../lib/posthog";
 import type { CreateJournalEntryInput, UpdateJournalEntryInput } from "../services/api/journal.ts";
 import { api } from "../services/api.ts";
@@ -114,7 +114,7 @@ export function TradingPage() {
     if (saved && TIMEFRAMES.includes(saved as Timeframe)) setTimeframe(saved as Timeframe);
   }, [selectedSymbol]);
 
-  const [activeIndicators, setActiveIndicators] = useState<IndicatorType[]>([]);
+  const [activeIndicators, setActiveIndicators] = useState<IndicatorInstance[]>([]);
   const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
   const [drawingTool, setDrawingTool] = useState<DrawingTool>("none");
   const {
@@ -316,6 +316,15 @@ export function TradingPage() {
     setActiveIndicators([]);
   }, []);
 
+  /** Apply edited params to one instance (legend / line-click popup). */
+  const handleUpdateIndicator = useCallback((id: string, params: Record<string, number>) => {
+    setActiveIndicators((prev) => prev.map((i) => (i.id === id ? { ...i, params } : i)));
+  }, []);
+
+  const handleRemoveIndicator = useCallback((id: string) => {
+    setActiveIndicators((prev) => prev.filter((i) => i.id !== id));
+  }, []);
+
   // Deep-history target used after the initial fast render completes.
   const deepCandleLimit = useMemo(() => {
     switch (timeframe) {
@@ -424,10 +433,8 @@ export function TradingPage() {
         timeframe={timeframe}
         onTimeframeChange={handleTimeframeChange}
         activeIndicators={activeIndicators}
-        onToggleIndicator={(type) =>
-          setActiveIndicators((prev) =>
-            prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
-          )
+        onAddIndicator={(type) =>
+          setActiveIndicators((prev) => [...prev, createIndicatorInstance(type, prev)])
         }
         showIndicatorMenu={showIndicatorMenu}
         onToggleIndicatorMenu={() => setShowIndicatorMenu((v) => !v)}
@@ -470,6 +477,8 @@ export function TradingPage() {
               timeframe={replayCandles ? "1m" : timeframe}
               isDark={isDark}
               activeIndicators={activeIndicators}
+              onUpdateIndicator={handleUpdateIndicator}
+              onRemoveIndicator={handleRemoveIndicator}
               drawingTool={drawingTool}
               drawings={drawings}
               onAddDrawing={addDrawing}
