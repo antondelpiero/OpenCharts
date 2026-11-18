@@ -1,204 +1,62 @@
-@import "tailwindcss";
-
-/* v3 used `darkMode: "class"`. This app is dark-by-default and opts *out* via a
-   `.light` class on <html>, but a few components still use `dark:` variants, so
-   keep the class-based variant working under v4's explicit variant API. */
-@custom-variant dark (&:where(.dark, .dark *));
-
-/* Theme tokens. `inline` keeps the generated utilities referencing the
-   `--background`/`--border`/... custom properties below, so the `:root` /
-   `.light` palette swap continues to drive every color utility at runtime. */
-@theme inline {
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-buy: var(--buy);
-  --color-sell: var(--sell);
-
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
-
-  --font-sans: Inter, system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
-
-  --animate-skeleton-pulse: skeleton-pulse 2s ease-in-out infinite;
-  --animate-slide-up: slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
-  --animate-fade-in: fade-in 0.2s ease-out;
-  --animate-candle-grow: candle-grow 0.6s ease-out forwards;
-  --animate-pulse-ring: pulse-ring 2s ease-in-out infinite;
-  --animate-bar-rise: bar-rise 0.7s ease-out forwards;
-
-  @keyframes skeleton-pulse {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.1; }
-  }
-  @keyframes slide-up {
-    0% { transform: translateY(100%); }
-    100% { transform: translateY(0); }
-  }
-  @keyframes fade-in {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
-  }
-  @keyframes candle-grow {
-    0% { transform: scaleY(0); transform-origin: bottom; }
-    100% { transform: scaleY(1); transform-origin: bottom; }
-  }
-  @keyframes pulse-ring {
-    0% { transform: scale(0.9); opacity: 0.8; }
-    50% { transform: scale(1.1); opacity: 0.4; }
-    100% { transform: scale(0.9); opacity: 0.8; }
-  }
-  @keyframes bar-rise {
-    0% { transform: scaleY(0); transform-origin: bottom; }
-    60% { transform: scaleY(1.05); transform-origin: bottom; }
-    100% { transform: scaleY(1); transform-origin: bottom; }
-  }
-}
-
-/* These animations are referenced only from this stylesheet (via @apply) and
-   from dynamically-built class strings, neither of which v4's source scanner
-   sees — so declare them as real utilities to guarantee they are emitted. */
-@utility animate-skeleton-pulse { animation: var(--animate-skeleton-pulse); }
-@utility animate-slide-up { animation: var(--animate-slide-up); }
-@utility animate-fade-in { animation: var(--animate-fade-in); }
-@utility animate-candle-grow { animation: var(--animate-candle-grow); }
-@utility animate-pulse-ring { animation: var(--animate-pulse-ring); }
-@utility animate-bar-rise { animation: var(--animate-bar-rise); }
-
-/* v4 removes the v3 preflight rule that made every element default to
-   `border-style: solid`, so bare `border` utilities would render nothing.
-   Restore it to keep the existing markup's borders visible. */
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-border, currentColor);
-  }
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   /* Deep dark trading theme — inspired by E8 Markets aesthetic */
   :root {
-    --background-hsl: 220 20% 4.5%;
-    --background: hsl(220 20% 4.5%);
-    --foreground-hsl: 210 20% 88%;
-    --foreground: hsl(210 20% 88%);
-    --card-hsl: 220 18% 7%;
-    --card: hsl(220 18% 7%);
-    --card-foreground-hsl: 210 20% 88%;
-    --card-foreground: hsl(210 20% 88%);
-    --primary-hsl: 168 80% 48%;
-    --primary: hsl(168 80% 48%);
-    --primary-foreground-hsl: 220 20% 4.5%;
-    --primary-foreground: hsl(220 20% 4.5%);
-    --secondary-hsl: 220 16% 11%;
-    --secondary: hsl(220 16% 11%);
-    --secondary-foreground-hsl: 210 20% 88%;
-    --secondary-foreground: hsl(210 20% 88%);
-    --muted-hsl: 220 14% 15%;
-    --muted: hsl(220 14% 15%);
-    --muted-foreground-hsl: 215 12% 48%;
-    --muted-foreground: hsl(215 12% 48%);
-    --accent-hsl: 168 80% 48%;
-    --accent: hsl(168 80% 48%);
-    --accent-foreground-hsl: 220 20% 4.5%;
-    --accent-foreground: hsl(220 20% 4.5%);
-    --destructive-hsl: 0 72% 56%;
-    --destructive: hsl(0 72% 56%);
-    --destructive-foreground-hsl: 210 40% 98%;
-    --destructive-foreground: hsl(210 40% 98%);
-    --border-hsl: 220 14% 14%;
-    --border: hsl(220 14% 14%);
-    --input-hsl: 220 16% 11%;
-    --input: hsl(220 16% 11%);
-    --ring-hsl: 168 80% 48%;
-    --ring: hsl(168 80% 48%);
+    --background: 220 20% 4.5%;
+    --foreground: 210 20% 88%;
+    --card: 220 18% 7%;
+    --card-foreground: 210 20% 88%;
+    --primary: 168 80% 48%;
+    --primary-foreground: 220 20% 4.5%;
+    --secondary: 220 16% 11%;
+    --secondary-foreground: 210 20% 88%;
+    --muted: 220 14% 15%;
+    --muted-foreground: 215 12% 48%;
+    --accent: 168 80% 48%;
+    --accent-foreground: 220 20% 4.5%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 14% 14%;
+    --input: 220 16% 11%;
+    --ring: 168 80% 48%;
     --radius: 0.5rem;
-    --success-hsl: 160 84% 44%;
-    --success: hsl(160 84% 44%);
-    --warning-hsl: 38 92% 50%;
-    --warning: hsl(38 92% 50%);
-    --buy-hsl: 160 84% 44%;
-    --buy: hsl(160 84% 44%);
-    --sell-hsl: 0 72% 56%;
-    --sell: hsl(0 72% 56%);
-    --panel-header-hsl: 220 16% 9%;
-    --panel-header: hsl(220 16% 9%);
-    --glow-hsl: 168 80% 48%;
-    --glow: hsl(168 80% 48%);
+    --success: 160 84% 44%;
+    --warning: 38 92% 50%;
+    --buy: 160 84% 44%;
+    --sell: 0 72% 56%;
+    --panel-header: 220 16% 9%;
+    --glow: 168 80% 48%;
   }
 
   /* Light theme */
   .light {
-    --background-hsl: 0 0% 98%;
-    --background: hsl(0 0% 98%);
-    --foreground-hsl: 222.2 84% 4.9%;
-    --foreground: hsl(222.2 84% 4.9%);
-    --card-hsl: 0 0% 100%;
-    --card: hsl(0 0% 100%);
-    --card-foreground-hsl: 222.2 84% 4.9%;
-    --card-foreground: hsl(222.2 84% 4.9%);
-    --primary-hsl: 168 80% 38%;
-    --primary: hsl(168 80% 38%);
-    --primary-foreground-hsl: 0 0% 100%;
-    --primary-foreground: hsl(0 0% 100%);
-    --secondary-hsl: 210 40% 96%;
-    --secondary: hsl(210 40% 96%);
-    --secondary-foreground-hsl: 222.2 84% 4.9%;
-    --secondary-foreground: hsl(222.2 84% 4.9%);
-    --muted-hsl: 210 40% 93%;
-    --muted: hsl(210 40% 93%);
-    --muted-foreground-hsl: 215 16% 47%;
-    --muted-foreground: hsl(215 16% 47%);
-    --accent-hsl: 168 80% 38%;
-    --accent: hsl(168 80% 38%);
-    --accent-foreground-hsl: 0 0% 100%;
-    --accent-foreground: hsl(0 0% 100%);
-    --destructive-hsl: 0 72% 51%;
-    --destructive: hsl(0 72% 51%);
-    --destructive-foreground-hsl: 0 0% 100%;
-    --destructive-foreground: hsl(0 0% 100%);
-    --border-hsl: 214 32% 91%;
-    --border: hsl(214 32% 91%);
-    --input-hsl: 214 32% 91%;
-    --input: hsl(214 32% 91%);
-    --ring-hsl: 168 80% 38%;
-    --ring: hsl(168 80% 38%);
+    --background: 0 0% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --primary: 168 80% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 93%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 168 80% 38%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 168 80% 38%;
     --radius: 0.5rem;
-    --success-hsl: 160 84% 35%;
-    --success: hsl(160 84% 35%);
-    --warning-hsl: 38 92% 45%;
-    --warning: hsl(38 92% 45%);
-    --buy-hsl: 160 84% 35%;
-    --buy: hsl(160 84% 35%);
-    --sell-hsl: 0 72% 51%;
-    --sell: hsl(0 72% 51%);
-    --panel-header-hsl: 210 40% 96%;
-    --panel-header: hsl(210 40% 96%);
-    --glow-hsl: 168 80% 38%;
-    --glow: hsl(168 80% 38%);
+    --success: 160 84% 35%;
+    --warning: 38 92% 45%;
+    --buy: 160 84% 35%;
+    --sell: 0 72% 51%;
+    --panel-header: 210 40% 96%;
+    --glow: 168 80% 38%;
   }
 
   * {
@@ -273,13 +131,13 @@
 
 /* ─── Glow Effects ───────────────────────────────────────── */
 .glow-buy {
-  text-shadow: 0 0 8px hsl(var(--buy-hsl) / 0.4);
+  text-shadow: 0 0 8px hsl(var(--buy) / 0.4);
 }
 .glow-sell {
-  text-shadow: 0 0 8px hsl(var(--sell-hsl) / 0.4);
+  text-shadow: 0 0 8px hsl(var(--sell) / 0.4);
 }
 .glow-accent {
-  text-shadow: 0 0 8px hsl(var(--accent-hsl) / 0.4);
+  text-shadow: 0 0 8px hsl(var(--accent) / 0.4);
 }
 
 /* ─── Stat Cards ─────────────────────────────────────────── */
@@ -457,7 +315,7 @@
   /* Disable hover effects on touch */
   @media (hover: none) {
     .hover\:bg-secondary:active {
-      background: var(--secondary);
+      background: hsl(var(--secondary));
     }
   }
 }

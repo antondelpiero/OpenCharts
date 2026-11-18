@@ -38,10 +38,9 @@ function scope(prefix, selector, prefixedSelector, filePath) {
 }
 
 export default {
-  // Tailwind v4 ships its own PostCSS plugin and handles vendor prefixing
-  // internally (Lightning CSS), so autoprefixer is no longer in the chain.
   plugins: [
-    (await import("@tailwindcss/postcss")).default,
+    (await import("tailwindcss")).default,
     prefixSelector({ prefix: SCOPE, transform: scope }),
+    (await import("autoprefixer")).default,
   ],
 };

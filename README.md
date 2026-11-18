@@ -20,7 +20,6 @@ Advanced charting · full drawing-tool suite · 8 indicators · session replay �
 >   The bundled demo data stays in the repo (`VITE_ADAPTER=demo`, tests); it is
 >   lazy-loaded, so the Binance default never downloads it.
 > - **Candles refresh at each bar close** (`lib/barClose.ts`) instead of every 5 min.
-> - **Tailwind CSS 4**, still scoped under `.opencharts` by `postcss.config.js`.
 > - **Indicators are instances**: the same indicator can be added several times
 >   with its own parameters, edited from the chart legend.
 
@@ -894,7 +893,7 @@ Good places to start:
   `OpenChartsAdapter` contract — [`examples/binance-adapter/`](examples/binance-adapter/)
   is the template, and the conformance suite tells you when it is right.
 - **Themes and layout customization** — the chart palette lives in
-  `pages/trading/constants.ts` and the design tokens in `src/styles/global.css` (`@theme`).
+  `pages/trading/constants.ts` and the design tokens in `tailwind.config.js`.
 - **Finishing or removing the dormant panels** listed under
   [Known limitations](#known-limitations).
 - **Tests, docs and bug reports** — coverage is thin and every report helps.

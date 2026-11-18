@@ -3,7 +3,7 @@
  * Builds dist-lib/style.css — the stylesheet integrators import.
  *
  * Runs the project's own PostCSS pipeline (Tailwind, then the `.opencharts`
- * scoping prefixer), so the shipped CSS is compiled: hosts
+ * scoping prefixer, then autoprefixer), so the shipped CSS is compiled: hosts
  * do not need Tailwind installed or configured, and nothing in it can reach
  * outside the terminal's root element.
  *
