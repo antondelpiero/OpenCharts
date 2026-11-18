@@ -186,8 +186,8 @@ function hitFibonacci(e: ResolvedEntry, p: Pt, tol: Tol): Hit | null {
   const anchor = anchorHit(e, p, tol);
   if (anchor) return anchor;
   if (e.x1 === null || e.x2 === null || !e.fibLevels) return null;
-  if (p.x < Math.min(e.x1, e.x2) - tol.line) return null;
-  if (p.x > Math.max(e.x1, e.x2) + tol.line) return null;
+  if (!e.d.extendLeft && p.x < Math.min(e.x1, e.x2) - tol.line) return null;
+  if (!e.d.extendRight && p.x > Math.max(e.x1, e.x2) + tol.line) return null;
   const onLevel = e.fibLevels.some((lvl) => lvl.y !== null && Math.abs(p.y - lvl.y) <= tol.line);
   return onLevel ? bodyHit(e) : null;
 }

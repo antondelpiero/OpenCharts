@@ -564,7 +564,9 @@ function LineStyleSection({
           onPick={(lineStyle) => patch({ lineStyle })}
         />
       </SettingsRow>
-      {drawing.type === "trendline" && <ExtendToggles drawing={drawing} patch={patch} />}
+      {(drawing.type === "trendline" || drawing.type === "fibonacci") && (
+        <ExtendToggles drawing={drawing} patch={patch} />
+      )}
       {(drawing.type === "trendline" || drawing.type === "arrow") && (
         <ArrowheadToggles drawing={drawing} patch={patch} />
       )}

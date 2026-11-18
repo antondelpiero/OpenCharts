@@ -558,10 +558,14 @@ function drawRectHandles(
 
 function renderFibonacci(scope: BitmapCoordinatesRenderingScope, e: ResolvedEntry): void {
   if (e.x1 === null || e.x2 === null || !e.fibLevels || e.fibLevels.length === 0) return;
-  const xA = Math.round(Math.min(e.x1, e.x2) * scope.horizontalPixelRatio);
-  const xB = Math.round(Math.max(e.x1, e.x2) * scope.horizontalPixelRatio);
+  const left = Math.round(Math.min(e.x1, e.x2) * scope.horizontalPixelRatio);
+  const right = Math.round(Math.max(e.x1, e.x2) * scope.horizontalPixelRatio);
+  // extendLeft/extendRight stretch the levels to the pane edges (as for
+  // trendlines); labels stay at the left anchor.
+  const xA = e.d.extendLeft ? 0 : left;
+  const xB = e.d.extendRight ? scope.bitmapSize.width : right;
   renderFibBands(scope, e.fibLevels, xA, xB);
-  for (const lvl of e.fibLevels) renderFibLevel(scope, lvl, xA, xB);
+  for (const lvl of e.fibLevels) renderFibLevel(scope, lvl, xA, xB, left);
   renderFibConnector(scope, e);
 }
 
@@ -588,6 +592,7 @@ function renderFibLevel(
   lvl: ResolvedFibLevel,
   xA: number,
   xB: number,
+  labelX: number = xA,
 ): void {
   if (lvl.y === null) return;
   const y = Math.round(lvl.y * scope.verticalPixelRatio);
@@ -598,7 +603,7 @@ function renderFibLevel(
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   ctx.fillStyle = lvl.color;
-  ctx.fillText(lvl.label, xA - 6 * scope.horizontalPixelRatio, y);
+  ctx.fillText(lvl.label, labelX - 6 * scope.horizontalPixelRatio, y);
   ctx.restore();
 }
 
