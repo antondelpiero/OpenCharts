@@ -17,9 +17,8 @@ Advanced charting · full drawing-tool suite · 8 indicators · session replay �
 > - **Live Binance data by default.** `.env.development` / `.env.production` set
 >   `VITE_ADAPTER=binance` (the [Binance adapter](examples/binance-adapter/)), and the
 >   production CSP allows its REST and WebSocket hosts. Override in `.env.local`.
-> - **No bundled market data.** `src/services/demo/data/` and
->   `scripts/fetch-demo-data.mjs` are removed, so `VITE_ADAPTER=demo` shows empty
->   charts. Sections below describing the bundled data apply to upstream only.
+>   The bundled demo data stays in the repo (`VITE_ADAPTER=demo`, tests); it is
+>   lazy-loaded, so the Binance default never downloads it.
 > - **Candles refresh at each bar close** (`lib/barClose.ts`) instead of every 5 min.
 > - **Tailwind CSS 4**, still scoped under `.opencharts` by `postcss.config.js`.
 > - **Indicators are instances**: the same indicator can be added several times
