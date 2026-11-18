@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import fs from "fs";
 import path from "path";
@@ -39,7 +39,7 @@ function securityHeaders(): Plugin {
   };
 }
 
-export default defineConfig({
+const config: UserConfig = {
   // GitHub Pages serves a project site from /<repo>/, so the demo workflow sets
   // BASE_PATH. Local builds and self-hosting stay at the domain root.
   base: process.env.BASE_PATH ?? "/",
@@ -87,4 +87,22 @@ export default defineConfig({
       },
     },
   },
+};
+
+/**
+ * Point the dev server's `/api` proxy at API_PROXY_TARGET from the active mode's
+ * env file (.env.development: local trading-api; .env.staging: the deployed
+ * one, via `npm run dev -- --mode staging`). Unset keeps the target above. Not a
+ * VITE_ variable, so it never reaches the browser bundle.
+ */
+export default defineConfig(({ mode }) => {
+  const target = loadEnv(mode, process.cwd(), "").API_PROXY_TARGET;
+  if (!target) return config;
+  return {
+    ...config,
+    server: {
+      ...config.server,
+      proxy: { ...config.server?.proxy, "/api": { target, changeOrigin: true } },
+    },
+  };
 });
