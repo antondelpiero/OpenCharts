@@ -11,6 +11,8 @@ import type { IChartApi, CandlestickData, Time } from "lightweight-charts";
 import { useEconomicCalendar, type EconomicCalendarEvent } from "../../services/queries.ts";
 import { type NewsOverlayConfig } from "./constants.ts";
 import { extractCurrencies } from "./utils.ts";
+import { safeStorage } from "../../lib/safe-storage.ts";
+import { isHyperliquidMode } from "../../hyperliquid/ui/mode.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -39,7 +41,7 @@ export function useNewsOverlay(
   chartData: CandlestickData<Time>[],
 ): UseNewsOverlayReturn {
   const [newsConfig, setNewsConfig] = useState<NewsOverlayConfig>(() => {
-    const saved = localStorage.getItem("newsOverlayConfig");
+    const saved = safeStorage.getItem("newsOverlayConfig");
     if (saved)
       try {
         return JSON.parse(saved) as NewsOverlayConfig;
@@ -62,17 +64,26 @@ export function useNewsOverlay(
 
   // Persist news config
   useEffect(() => {
-    localStorage.setItem("newsOverlayConfig", JSON.stringify(newsConfig));
+    safeStorage.setItem("newsOverlayConfig", JSON.stringify(newsConfig));
   }, [newsConfig]);
 
+  // Past/future filtering needs a clock. Keep it in state on a one-minute
+  // cadence rather than reading Date.now() inside the memo: render stays pure
+  // and the split between past and future events actually refreshes over time.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Extract currency pair from symbol
-  const symbolCurrencies = useMemo(() => extractCurrencies(selectedSymbol), [selectedSymbol]);
+  const symbolCurrencies = useMemo(() => isHyperliquidMode() ? [] : extractCurrencies(selectedSymbol), [selectedSymbol]);
   const { data: rawCalendarData } = useEconomicCalendar(symbolCurrencies);
 
   // Filter events based on config
   const calendarEvents = useMemo(() => {
     if (!newsConfig.enabled) return [];
-    const now = Date.now();
+    const now = nowMs;
     return (rawCalendarData || []).filter((e: EconomicCalendarEvent) => {
       if (e.impact === "high" && !newsConfig.showHigh) return false;
       if (e.impact === "medium" && !newsConfig.showMedium) return false;
@@ -82,7 +93,7 @@ export function useNewsOverlay(
       if (eventTime > now && !newsConfig.showFuture) return false;
       return true;
     });
-  }, [rawCalendarData, newsConfig]);
+  }, [rawCalendarData, newsConfig, nowMs]);
 
   // Render news markers on chart (vertical lines + flag icons)
   useEffect(() => {

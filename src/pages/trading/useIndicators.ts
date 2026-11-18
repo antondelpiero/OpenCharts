@@ -36,8 +36,12 @@ export function useIndicators(
 ): void {
   const indicatorSeriesRef = useRef<Map<string, AnySeries>>(new Map());
   const colors = isDark ? CHART_COLORS.dark : CHART_COLORS.light;
+  // Latest-callback ref, synced in an effect rather than during render. Declared
+  // before the series effect below, so it has already run when that one reads it.
   const onSeriesIndexRef = useRef(onSeriesIndex);
-  onSeriesIndexRef.current = onSeriesIndex;
+  useEffect(() => {
+    onSeriesIndexRef.current = onSeriesIndex;
+  }, [onSeriesIndex]);
 
   useEffect(() => {
     if (!chartRef.current || !candleSeriesRef.current || chartData.length === 0) return;

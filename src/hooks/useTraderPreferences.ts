@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../services/api.ts";
 import { useAuthStore } from "../services/store.tsx";
+import { safeStorage } from "../lib/safe-storage.ts";
 
 export type TraderPrefs = Record<string, string>;
 
@@ -22,13 +23,13 @@ function parsePrefs(raw: string | null): TraderPrefs {
 }
 
 export function readTraderPrefs(userId?: string | null): TraderPrefs {
-  const scoped = parsePrefs(localStorage.getItem(getTraderPrefsStorageKey(userId)));
+  const scoped = parsePrefs(safeStorage.getItem(getTraderPrefsStorageKey(userId)));
   if (Object.keys(scoped).length > 0) return scoped;
-  return parsePrefs(localStorage.getItem(LEGACY_TRADER_PREFS_KEY));
+  return parsePrefs(safeStorage.getItem(LEGACY_TRADER_PREFS_KEY));
 }
 
 export function writeTraderPrefs(prefs: TraderPrefs, userId?: string | null): void {
-  localStorage.setItem(getTraderPrefsStorageKey(userId), JSON.stringify(prefs));
+  safeStorage.setItem(getTraderPrefsStorageKey(userId), JSON.stringify(prefs));
 }
 
 export function applyAccentColorFromPrefs(prefs: TraderPrefs): void {
@@ -44,20 +45,30 @@ function dispatchChartPrefsUpdated(): void {
 
 export function useTraderPreferences() {
   const userId = useAuthStore((s) => s.user?.id);
-  const [prefs, setPrefs] = useState<TraderPrefs>(() => readTraderPrefs(userId));
+  // Tagged by user so a change of account needs no reset effect: preferences
+  // belonging to the previous user stop matching and the local set is read
+  // fresh instead.
+  const [stored, setStored] = useState<{ userId: string | undefined; prefs: TraderPrefs }>(() => ({
+    userId,
+    prefs: readTraderPrefs(userId),
+  }));
+  const prefs = stored.userId === userId ? stored.prefs : readTraderPrefs(userId);
+  const setPrefs = useCallback(
+    (next: TraderPrefs) => setStored({ userId, prefs: next }),
+    [userId],
+  );
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const local = readTraderPrefs(userId);
-    setPrefs(local);
     applyAccentColorFromPrefs(local);
 
     api
       .getPreferences()
-      .then((serverPrefs: unknown) => {
+      .then((serverPrefs: TraderPrefs | null) => {
         if (serverPrefs && typeof serverPrefs === "object") {
-          const merged = { ...(serverPrefs as TraderPrefs), ...local };
-          setPrefs(merged);
+          const merged = { ...serverPrefs, ...local };
+          setStored({ userId, prefs: merged });
           writeTraderPrefs(merged, userId);
           applyAccentColorFromPrefs(merged);
         }
@@ -74,7 +85,7 @@ export function useTraderPreferences() {
       dispatchChartPrefsUpdated();
       api.savePreferences(next).catch(() => {});
     },
-    [userId],
+    [userId, setPrefs],
   );
 
   const savePreference = useMemo(

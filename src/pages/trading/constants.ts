@@ -4,11 +4,12 @@ export const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"] as 
 export type Timeframe = (typeof TIMEFRAMES)[number];
 
 /**
- * Master switch for session replay (HUD + scrubber). Disabled on the live
- * terminal until the feature is fully QA'd — flip to `true` to re-enable the
- * replay controls everywhere they mount.
+ * Master switch for session replay (HUD + scrubber). Backed by the demo replay
+ * provider in services/demo/replay.ts: the buffer is the bundled 1m history for
+ * the charted symbol and the transport state is broadcast on the same channel
+ * the real backend used.
  */
-export const REPLAY_ENABLED = false;
+export const REPLAY_ENABLED = true;
 
 export const CHART_COLORS = {
   dark: {
@@ -276,6 +277,11 @@ export interface EconomicEvent {
   actual?: string;
 }
 
+/**
+ * Placeholder economic events for the fallback calendar view. The default
+ * calendar is TradingView's live widget; this table is what the toggle shows
+ * when that is turned off, and is labelled as sample data in the UI.
+ */
 export const MOCK_EVENTS: EconomicEvent[] = [
   {
     time: "08:30",
@@ -335,41 +341,46 @@ export interface NewsItem {
   impact: "bullish" | "bearish" | "neutral";
 }
 
+/**
+ * Placeholder headlines for the News tab. OpenCharts ships no news feed, so
+ * these exist only to show the panel's shape — they carry a "Sample" source
+ * rather than a real outlet's name, and the tab labels them as sample data.
+ */
 export const MOCK_NEWS: NewsItem[] = [
   {
     time: "2m ago",
     title: "Fed signals potential rate cut in September meeting",
-    source: "Reuters",
+    source: "Sample",
     impact: "bullish",
   },
   {
     time: "15m ago",
     title: "EUR/USD breaks above key resistance at 1.0950",
-    source: "FXStreet",
+    source: "Sample",
     impact: "bullish",
   },
   {
     time: "32m ago",
     title: "Oil prices surge on OPEC+ production cut extension",
-    source: "Bloomberg",
+    source: "Sample",
     impact: "neutral",
   },
   {
     time: "1h ago",
     title: "Bank of Japan maintains ultra-loose monetary policy",
-    source: "Nikkei",
+    source: "Sample",
     impact: "bearish",
   },
   {
     time: "2h ago",
     title: "US Treasury yields climb ahead of jobs data",
-    source: "CNBC",
+    source: "Sample",
     impact: "bearish",
   },
   {
     time: "3h ago",
     title: "Gold hits record high amid geopolitical tensions",
-    source: "Reuters",
+    source: "Sample",
     impact: "bullish",
   },
 ];

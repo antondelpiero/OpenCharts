@@ -6,7 +6,6 @@ import {
   ArrowUpDown,
   ArrowUpRight,
   BarChart3,
-  Bot,
   CalendarDays,
   ChevronDown,
   Circle,
@@ -53,6 +52,7 @@ import {
   type Timeframe,
 } from "./constants.ts";
 import { ChartTemplatesMenu } from "./ChartTemplatesMenu.tsx";
+import { isHyperliquidMode } from "../../hyperliquid/ui/mode.ts";
 import { ReplayHUD } from "./ReplayHUD.tsx";
 import { getPipDigits } from "./utils.ts";
 
@@ -81,8 +81,7 @@ export interface ChartToolbarProps {
   drawings: DrawingLine[];
   onClearDrawings: () => void;
   rightPanel: string;
-  onRightPanel: (p: "order" | "dom" | "watchlist" | "news" | "ai-trader" | "tv-analysis") => void;
-  aiTraderEnabled?: boolean;
+  onRightPanel: (p: "order" | "dom" | "watchlist" | "news" | "tv-analysis") => void;
   showRightPanel: boolean;
   onToggleRightPanel: () => void;
   tick?: { bid: number; ask: number; timestamp: number };
@@ -132,7 +131,6 @@ export function ChartToolbar({
   onToggleRightPanel,
   tick,
   symbolInfo,
-  aiTraderEnabled,
   isReplaying = false,
   replayAccountId,
   activePlugins = [],
@@ -261,6 +259,9 @@ export function ChartToolbar({
                     )}
                   >
                     <span className="font-medium">{s.name}</span>
+                    {s.displayName && s.displayName !== s.name && (
+                      <span className="text-xs text-muted-foreground ml-2 mr-auto">{s.displayName}</span>
+                    )}
                     <span className="text-muted-foreground text-xs">{s.category}</span>
                   </button>
                 ))}
@@ -417,26 +418,21 @@ export function ChartToolbar({
           active={showRightPanel && rightPanel === "watchlist"}
           onClick={() => onRightPanel("watchlist")}
         />
-        <ToolButton
-          icon={Newspaper}
-          tooltip="News"
-          active={showRightPanel && rightPanel === "news"}
-          onClick={() => onRightPanel("news")}
-        />
+        {/* The news panel is sample data; a live broker must not show it. */}
+        {!isHyperliquidMode() && (
+          <ToolButton
+            icon={Newspaper}
+            tooltip="News"
+            active={showRightPanel && rightPanel === "news"}
+            onClick={() => onRightPanel("news")}
+          />
+        )}
         <ToolButton
           icon={Star}
           tooltip="TradingView Analysis"
           active={showRightPanel && rightPanel === "tv-analysis"}
           onClick={() => onRightPanel("tv-analysis")}
         />
-        {aiTraderEnabled && (
-          <ToolButton
-            icon={Bot}
-            tooltip="AI Trader"
-            active={showRightPanel && rightPanel === "ai-trader"}
-            onClick={() => onRightPanel("ai-trader")}
-          />
-        )}
         <div className="h-4 border-l border-border mx-1" />
         <button
           onClick={onToggleRightPanel}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   Minus,
   Plus,
@@ -18,7 +18,16 @@ import type { PlaceOrderInput } from "../../services/schemas.ts";
 import { toast } from "../../services/toast.ts";
 import { formatCurrency, formatNumber, cn } from "../../lib/utils.ts";
 
-type ConfirmableOrder = PlaceOrderInput & { _submit: () => Promise<unknown> };
+import type { ConfirmOrderState } from "../../terminal/use-terminal.ts";
+import { isHyperliquidMode } from "../../hyperliquid/ui/mode.ts";
+
+type ConfirmableOrder = NonNullable<ConfirmOrderState>;
+
+// The Hyperliquid ticket (fees, leverage, margin mode) is loaded on demand so
+// it never reaches the default demo bundle.
+const HlOrderPanel = lazy(() =>
+  import("../../hyperliquid/ui/HlOrderPanel.tsx").then((m) => ({ default: m.HlOrderPanel })),
+);
 
 export interface OrderPanelProps {
   symbol: string;
@@ -44,7 +53,19 @@ export interface OrderPanelProps {
   onOrderSuccess?: () => void;
 }
 
-export function OrderPanel({
+/** The order ticket: the Hyperliquid variant when that adapter is installed, else the generic one. */
+export function OrderPanel(props: OrderPanelProps) {
+  if (isHyperliquidMode()) {
+    return (
+      <Suspense fallback={null}>
+        <HlOrderPanel {...props} />
+      </Suspense>
+    );
+  }
+  return <GenericOrderPanel {...props} />;
+}
+
+function GenericOrderPanel({
   symbol,
   symbolInfo,
   tick,
@@ -171,7 +192,9 @@ export function OrderPanel({
       return;
     }
 
-    doSubmit();
+    // onError already toasts the reason — absorb the rejection so it does not
+    // surface as an unhandled promise.
+    doSubmit().catch(() => {});
   };
 
   const quickQty = [0.01, 0.05, 0.1, 0.5, 1.0];

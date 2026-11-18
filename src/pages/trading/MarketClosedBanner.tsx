@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Clock } from "lucide-react";
 import type { Symbol } from "../../services/schemas";
 import { useTradingStore } from "../../services/store.tsx";
+import { HlMarketNotice } from "../../hyperliquid/ui/HlMarketNotice.tsx";
+import { isHyperliquidMode } from "../../hyperliquid/ui/mode.ts";
 
 /**
  * How long after the last tick we consider the feed still live.
@@ -113,7 +115,17 @@ interface Props {
   symbolInfo: Symbol | undefined;
 }
 
+/**
+ * Hyperliquid markets trade around the clock, so the schedule-based "market
+ * closed" claim below would be wrong for them. In that mode show the
+ * informational oracle/liquidity notice instead (never a trading block).
+ */
 export function MarketClosedBanner({ symbolInfo }: Props) {
+  if (isHyperliquidMode()) return <HlMarketNotice category={symbolInfo?.category} />;
+  return <ScheduleMarketClosedBanner symbolInfo={symbolInfo} />;
+}
+
+function ScheduleMarketClosedBanner({ symbolInfo }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mountedAt] = useState(() => Date.now());
   const ticks = useTradingStore((s) => s.ticks);
@@ -129,13 +141,17 @@ export function MarketClosedBanner({ symbolInfo }: Props) {
   if (category.toUpperCase() === "CRYPTO") return null;
 
   // If the feed is actively delivering ticks for this symbol, the market is open.
+  // `now` ticks once a second; using it (instead of reading the clock during
+  // render) keeps the component pure and makes every check below agree on one
+  // instant.
+  const nowMs = now.getTime();
   const symbolTick = ticks[symbolInfo.name ?? ""];
-  if (symbolTick && Date.now() - symbolTick.timestamp < LIVE_TICK_GRACE_MS) return null;
+  if (symbolTick && nowMs - symbolTick.timestamp < LIVE_TICK_GRACE_MS) return null;
 
   // No tick yet — give the WebSocket connection time to deliver the first tick
   // before falling back to schedule-based logic. Prevents a false "closed"
   // flash on page load and after tab resume.
-  if (!symbolTick && Date.now() - mountedAt < STARTUP_HOLDOFF_MS) return null;
+  if (!symbolTick && nowMs - mountedAt < STARTUP_HOLDOFF_MS) return null;
 
   const tradingHours = ((symbolInfo as Record<string, unknown>).tradingHours ??
     []) as TradingHours[];

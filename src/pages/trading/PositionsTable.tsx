@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "../../services/toast.ts";
 import { X, Scissors } from "lucide-react";
 import { formatNumber, formatCurrency, formatDate, cn, pnlClass } from "../../lib/utils.ts";
 
@@ -13,6 +14,12 @@ interface PositionRow {
   stopLoss?: number | null;
   takeProfit?: number | null;
   openedAt: string | Date;
+  /** Exchange-reported liquidation price (Hyperliquid). */
+  liquidationPx?: number | null;
+  /** Funding since the position opened, USD, as reported by the exchange. */
+  fundingSinceOpen?: number;
+  marginMode?: "cross" | "isolated";
+  leverage?: number;
 }
 
 export function PositionsTable({
@@ -31,6 +38,11 @@ export function PositionsTable({
   const [partialCloseId, setPartialCloseId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState("");
 
+  // Optional exchange detail: columns appear only when the adapter supplies it.
+  const showLiq = positions.some((p) => p.liquidationPx !== undefined);
+  const showFunding = positions.some((p) => p.fundingSinceOpen !== undefined);
+  const showMargin = positions.some((p) => p.marginMode !== undefined);
+
   if (positions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
@@ -41,7 +53,19 @@ export function PositionsTable({
 
   const handlePartialSubmit = (positionId: string, maxQty: number) => {
     const qty = parseFloat(partialQty);
-    if (!qty || qty <= 0 || qty >= maxQty) return;
+    // Explain the rejection instead of swallowing the click: an out-of-range
+    // value previously looked identical to a successful partial close.
+    if (!Number.isFinite(qty) || qty <= 0) {
+      toast.warning("Invalid Quantity", "Enter a positive quantity to close");
+      return;
+    }
+    if (qty >= maxQty) {
+      toast.warning(
+        "Quantity Too Large",
+        `Enter less than ${maxQty} — use Close to exit the whole position`,
+      );
+      return;
+    }
     onPartialClose?.(positionId, qty);
     setPartialCloseId(null);
     setPartialQty("");
@@ -57,6 +81,9 @@ export function PositionsTable({
           <th>Entry</th>
           <th>Current</th>
           <th>P&L</th>
+          {showLiq && <th>Liq.</th>}
+          {showFunding && <th title="Funding since the position opened, as reported by Hyperliquid">Funding</th>}
+          {showMargin && <th>Margin</th>}
           <th>SL</th>
           <th>TP</th>
           <th>Time</th>
@@ -87,6 +114,22 @@ export function PositionsTable({
               {p.unrealizedPnl >= 0 ? "+" : ""}
               {formatCurrency(p.unrealizedPnl)}
             </td>
+            {showLiq && (
+              <td className="font-mono text-warning" data-testid="liq-price">
+                {p.liquidationPx ? formatNumber(p.liquidationPx, 5) : "--"}
+              </td>
+            )}
+            {showFunding && (
+              <td className="font-mono" data-testid="funding">
+                {p.fundingSinceOpen !== undefined ? formatCurrency(p.fundingSinceOpen) : "--"}
+              </td>
+            )}
+            {showMargin && (
+              <td className="capitalize" data-testid="margin-mode">
+                {p.marginMode ?? "--"}
+                {p.leverage ? ` ${p.leverage}x` : ""}
+              </td>
+            )}
             <td className="font-mono text-sell">
               {p.stopLoss ? formatNumber(p.stopLoss, 5) : "--"}
             </td>
@@ -103,8 +146,8 @@ export function PositionsTable({
                     onChange={(e) => setPartialQty(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     placeholder={`Max ${p.quantity}`}
-                    min={0.01}
-                    max={p.quantity - 0.01}
+                    min={0}
+                    max={p.quantity}
                     step="any"
                     className="w-16 h-5 text-[10px] rounded border border-border bg-background px-1 font-mono"
                     autoFocus
@@ -149,7 +192,7 @@ export function PositionsTable({
                       Modify
                     </button>
                   )}
-                  {onPartialClose && p.quantity > 1 && (
+                  {onPartialClose && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
