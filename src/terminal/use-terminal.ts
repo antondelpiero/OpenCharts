@@ -73,6 +73,13 @@ export interface TerminalContextValue {
   drawings: DrawingLine[];
   /** Detected patterns (read-only analysis) for the charted symbol and timeframe. */
   patterns: PatternOverlay[];
+  /** Detected patterns across every timeframe of the symbol (patterns panel). */
+  allPatterns: PatternOverlay[];
+  /** Timeframe the patterns panel lists first (charted one, or last charted one with patterns). */
+  leadingPatternTimeframe: string | null;
+  patternsLoading: boolean;
+  /** The analysis backend could not be reached. */
+  patternsUnavailable: boolean;
   /** Drawings of the patterns that are not hidden. */
   patternOverlays: DrawingLine[];
   hiddenPatternIds: ReadonlySet<string>;

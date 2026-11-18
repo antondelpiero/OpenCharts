@@ -12,6 +12,7 @@ import { ChartPanel } from "./trading/ChartPanel.tsx";
 import { ChartToolbar } from "./trading/ChartToolbar.tsx";
 import { REPLAY_ENABLED } from "./trading/constants.ts";
 import { DOMPanel } from "./trading/DOMPanel.tsx";
+import { PatternsPanel } from "./trading/PatternsPanel.tsx";
 import { MarketClosedBanner } from "./trading/MarketClosedBanner.tsx";
 import { OrderPanel } from "./trading/OrderPanel.tsx";
 import { ReplayScrubber } from "./trading/ReplayScrubber.tsx";
@@ -61,6 +62,10 @@ export function TradingPage() {
     setDrawingTool,
     drawings,
     patterns,
+    allPatterns,
+    leadingPatternTimeframe,
+    patternsLoading,
+    patternsUnavailable,
     patternOverlays,
     hiddenPatternIds,
     togglePattern,
@@ -102,7 +107,7 @@ export function TradingPage() {
     "positions" | "orders" | "history" | "journal" | "calendar" | "news"
   >("positions");
   const [rightPanel, setRightPanel] = useState<
-    "order" | "dom" | "watchlist" | "news" | "tv-analysis"
+    "order" | "dom" | "watchlist" | "news" | "tv-analysis" | "patterns"
   >("order");
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -320,6 +325,19 @@ export function TradingPage() {
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 <MarketNewsFeed symbol={selectedSymbol} />
               </div>
+            )}
+            {rightPanel === "patterns" && (
+              <PatternsPanel
+                symbol={selectedSymbol}
+                patterns={allPatterns}
+                timeframe={timeframe}
+                leadingTimeframe={leadingPatternTimeframe}
+                hiddenIds={hiddenPatternIds}
+                loading={patternsLoading}
+                unavailable={patternsUnavailable}
+                onToggle={togglePattern}
+                onShowTimeframe={handleTimeframeChange}
+              />
             )}
             {rightPanel === "tv-analysis" && (
               <div className="flex-1 overflow-hidden">

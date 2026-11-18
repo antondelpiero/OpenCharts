@@ -43,9 +43,19 @@ export function usePatternOverlays(
     [query.data, timeframe, lastBarSec, isDark],
   );
 
+  // Every timeframe's patterns, for the patterns panel. Only the charted
+  // timeframe knows its last candle, so only its projections are drawn.
+  const allOverlays = useMemo<PatternOverlay[]>(() => {
+    if (!query.data) return [];
+    const timeframes = [...new Set(query.data.map((e) => e.timeframe))];
+    return timeframes.flatMap((tf) =>
+      tf === timeframe ? overlays : toOverlays(query.data, tf, null, isDark),
+    );
+  }, [query.data, timeframe, overlays, isDark]);
+
   useEffect(() => {
     if (query.error) console.warn("[pattern-overlays] analysis unavailable:", query.error.message);
   }, [query.error]);
 
-  return { overlays, isLoading: query.isLoading, error: query.error };
+  return { overlays, allOverlays, isLoading: query.isLoading, error: query.error };
 }

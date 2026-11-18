@@ -1,23 +1,14 @@
 import { useEffect, useRef } from "react";
 import { Eye, EyeOff, X } from "lucide-react";
 import type { PatternOverlay } from "../../lib/pattern-overlays";
+import {
+  capitalize,
+  directionClass,
+  formatPrice,
+  humanize,
+  percent,
+} from "../../lib/pattern-overlays/format";
 import { cn } from "../../lib/utils.ts";
-
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-/** "AT_LEVEL" → "At level" */
-const humanize = (s: string) => capitalize(s.replace(/_/g, " "));
-const percent = (c: number) => `${Math.round(c * 100)}%`;
-
-function formatPrice(p: number): string {
-  const digits = Math.abs(p) >= 100 ? 2 : Math.abs(p) >= 1 ? 4 : 6;
-  return p.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-}
-
-function directionClass(direction: string | null): string {
-  if (direction === "bullish") return "text-buy";
-  if (direction === "bearish") return "text-sell";
-  return "text-muted-foreground";
-}
 
 interface LegendProps {
   patterns: PatternOverlay[];
@@ -92,26 +83,12 @@ interface InfoPopupProps {
   onClose: () => void;
 }
 
-/** Read-only details of one detected pattern. */
-export function PatternInfoPopup({ pattern, hidden, x, y, onToggle, onClose }: InfoPopupProps) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Dismiss on outside click / Escape.
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-
+/**
+ * The read-only facts of one pattern: direction, confidence, state, validity,
+ * key prices and the analyzer's expectation. Shared by the chart popup and the
+ * patterns panel so both always show the same thing.
+ */
+export function PatternDetails({ pattern }: { pattern: PatternOverlay }) {
   const rows: Array<[string, React.ReactNode]> = [];
   if (pattern.direction) {
     rows.push(["Direction", <span className={directionClass(pattern.direction)}>{capitalize(pattern.direction)}</span>]);
@@ -121,25 +98,7 @@ export function PatternInfoPopup({ pattern, hidden, x, y, onToggle, onClose }: I
   rows.push(["Valid until", new Date(pattern.expiresAt).toLocaleString()]);
 
   return (
-    <div
-      ref={ref}
-      className="fixed z-[80] w-64 bg-card border border-border rounded-lg shadow-xl p-2.5 text-xs"
-      style={{ left: Math.min(x, window.innerWidth - 272), top: Math.min(y, window.innerHeight - 320) }}
-    >
-      <div className="flex items-start gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="font-medium">
-            {pattern.name} · {pattern.timeframe}
-          </div>
-          {pattern.patternType && (
-            <div className="text-[10px] font-mono text-muted-foreground truncate">{pattern.patternType}</div>
-          )}
-        </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground" title="Close">
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
+    <>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
@@ -165,6 +124,51 @@ export function PatternInfoPopup({ pattern, hidden, x, y, onToggle, onClose }: I
           {pattern.note}
         </p>
       )}
+    </>
+  );
+}
+
+/** Read-only details of one detected pattern, as a popup over the chart. */
+export function PatternInfoPopup({ pattern, hidden, x, y, onToggle, onClose }: InfoPopupProps) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Dismiss on outside click / Escape.
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="fixed z-[80] w-64 bg-card border border-border rounded-lg shadow-xl p-2.5 text-xs"
+      style={{ left: Math.min(x, window.innerWidth - 272), top: Math.min(y, window.innerHeight - 320) }}
+    >
+      <div className="flex items-start gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium">
+            {pattern.name} · {pattern.timeframe}
+          </div>
+          {pattern.patternType && (
+            <div className="text-[10px] font-mono text-muted-foreground truncate">{pattern.patternType}</div>
+          )}
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground" title="Close">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <PatternDetails pattern={pattern} />
 
       <div className="flex items-center justify-between mt-2.5">
         <span className="text-[10px] text-muted-foreground">Read-only analysis</span>

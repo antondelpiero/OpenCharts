@@ -322,7 +322,20 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
   // ── Detected-pattern overlays (read-only, from the trading backend)
   const lastBarSec = candles.length > 0 ? (candles[candles.length - 1]!.time as number) : null;
-  const { overlays: patterns } = usePatternOverlays(selectedSymbol, timeframe, lastBarSec, isDark);
+  const {
+    overlays: patterns,
+    allOverlays: allPatterns,
+    isLoading: patternsLoading,
+    error: patternsError,
+  } = usePatternOverlays(selectedSymbol, timeframe, lastBarSec, isDark);
+  // The timeframe listed first in the patterns panel: the charted one when it
+  // has patterns, otherwise the last charted one that did (switching to a
+  // timeframe without detections keeps the previous one on top). Adjusted
+  // during render, React's pattern for state derived from changing inputs.
+  const [leadingPatternTimeframe, setLeadingPatternTimeframe] = useState<string | null>(null);
+  if (leadingPatternTimeframe !== timeframe && allPatterns.some((p) => p.timeframe === timeframe)) {
+    setLeadingPatternTimeframe(timeframe);
+  }
   // Hidden patterns (session only). Ids are per analysis, so a newly run
   // analysis shows again even if the previous one was hidden.
   const [hiddenPatternIds, setHiddenPatternIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -491,6 +504,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     setDrawingTool,
     drawings,
     patterns,
+    allPatterns,
+    leadingPatternTimeframe,
+    patternsLoading,
+    patternsUnavailable: patternsError !== null,
     patternOverlays,
     hiddenPatternIds,
     togglePattern,

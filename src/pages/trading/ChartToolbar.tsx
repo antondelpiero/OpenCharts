@@ -6,12 +6,14 @@ import {
   ArrowUpDown,
   ArrowUpRight,
   BarChart3,
+  ChartArea,
   CalendarDays,
   ChevronDown,
   Circle,
   Clock,
   Crosshair,
   Equal,
+  Gauge,
   Info,
   Layers,
   Layers3,
@@ -81,7 +83,7 @@ export interface ChartToolbarProps {
   drawings: DrawingLine[];
   onClearDrawings: () => void;
   rightPanel: string;
-  onRightPanel: (p: "order" | "dom" | "watchlist" | "news" | "tv-analysis") => void;
+  onRightPanel: (p: "order" | "dom" | "watchlist" | "news" | "tv-analysis" | "patterns") => void;
   showRightPanel: boolean;
   onToggleRightPanel: () => void;
   tick?: { bid: number; ask: number; timestamp: number };
@@ -401,6 +403,12 @@ export function ChartToolbar({
       {/* Right Panel Toggles */}
       <div className="hidden md:flex items-center gap-0.5">
         <ToolButton
+          icon={ChartArea}
+          tooltip="Detected Patterns"
+          active={showRightPanel && rightPanel === "patterns"}
+          onClick={() => onRightPanel("patterns")}
+        />
+        <ToolButton
           icon={ArrowUpDown}
           tooltip="Order Panel"
           active={showRightPanel && rightPanel === "order"}
@@ -413,7 +421,7 @@ export function ChartToolbar({
           onClick={() => onRightPanel("dom")}
         />
         <ToolButton
-          icon={BarChart3}
+          icon={Star}
           tooltip="Watchlist"
           active={showRightPanel && rightPanel === "watchlist"}
           onClick={() => onRightPanel("watchlist")}
@@ -428,7 +436,7 @@ export function ChartToolbar({
           />
         )}
         <ToolButton
-          icon={Star}
+          icon={Gauge}
           tooltip="TradingView Analysis"
           active={showRightPanel && rightPanel === "tv-analysis"}
           onClick={() => onRightPanel("tv-analysis")}
