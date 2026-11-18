@@ -60,6 +60,10 @@ export function TradingPage() {
     drawingTool,
     setDrawingTool,
     drawings,
+    patterns,
+    patternOverlays,
+    hiddenPatternIds,
+    togglePattern,
     addDrawing,
     updateDrawing,
     removeDrawing,
@@ -214,6 +218,10 @@ export function TradingPage() {
               onRemoveIndicator={removeIndicator}
               drawingTool={drawingTool}
               drawings={drawings}
+              overlays={patternOverlays}
+              patterns={patterns}
+              hiddenPatternIds={hiddenPatternIds}
+              onTogglePattern={togglePattern}
               onAddDrawing={addDrawing}
               onUpdateDrawing={updateDrawing}
               onRemoveDrawing={removeDrawing}

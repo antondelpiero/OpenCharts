@@ -29,6 +29,10 @@ export function Chart() {
       onRemoveIndicator={t.removeIndicator}
       drawingTool={t.drawingTool}
       drawings={t.drawings}
+      overlays={t.patternOverlays}
+      patterns={t.patterns}
+      hiddenPatternIds={t.hiddenPatternIds}
+      onTogglePattern={t.togglePattern}
       onAddDrawing={t.addDrawing}
       onUpdateDrawing={t.updateDrawing}
       onRemoveDrawing={t.removeDrawing}

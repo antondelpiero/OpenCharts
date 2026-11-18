@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { IndicatorInstance, IndicatorType } from "../lib/indicators.ts";
+import type { PatternOverlay } from "../lib/pattern-overlays/index.ts";
 import type { CreateJournalEntryInput, UpdateJournalEntryInput } from "../services/api/journal.ts";
 import type {
   useCandles,
@@ -70,6 +71,12 @@ export interface TerminalContextValue {
   drawingTool: DrawingTool;
   setDrawingTool: (tool: DrawingTool) => void;
   drawings: DrawingLine[];
+  /** Detected patterns (read-only analysis) for the charted symbol and timeframe. */
+  patterns: PatternOverlay[];
+  /** Drawings of the patterns that are not hidden. */
+  patternOverlays: DrawingLine[];
+  hiddenPatternIds: ReadonlySet<string>;
+  togglePattern: (id: string) => void;
   addDrawing: (drawing: DrawingLine) => void;
   updateDrawing: (drawing: DrawingLine) => void;
   removeDrawing: (id: string) => void;

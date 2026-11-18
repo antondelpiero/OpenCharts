@@ -12,6 +12,7 @@ import {
   PositionModifyDialog,
 } from "../components/TradingDialogs.tsx";
 import { useChartDrawings } from "../hooks/useChartDrawings.ts";
+import { usePatternOverlays } from "../hooks/usePatternOverlays.ts";
 import {
   getChartPreferencesFromStorage,
   updateChartPreferences,
@@ -178,6 +179,24 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     undo: undoDrawing,
     redo: redoDrawing,
   } = useChartDrawings(selectedSymbol, timeframe);
+
+  // ── Detected-pattern overlays (read-only, from the trading backend)
+  const { overlays: patterns } = usePatternOverlays(selectedSymbol, timeframe);
+  // Hidden patterns (session only). Ids are per analysis, so a newly run
+  // analysis shows again even if the previous one was hidden.
+  const [hiddenPatternIds, setHiddenPatternIds] = useState<ReadonlySet<string>>(() => new Set());
+  const togglePattern = useCallback((id: string) => {
+    setHiddenPatternIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const patternOverlays = useMemo(
+    () => patterns.filter((p) => !hiddenPatternIds.has(p.id)).flatMap((p) => p.drawings),
+    [patterns, hiddenPatternIds],
+  );
 
   // ── Trading preferences
   const [oneClick, setOneClick] = useState(
@@ -469,6 +488,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     drawingTool,
     setDrawingTool,
     drawings,
+    patterns,
+    patternOverlays,
+    hiddenPatternIds,
+    togglePattern,
     addDrawing,
     updateDrawing,
     removeDrawing,

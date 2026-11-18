@@ -54,6 +54,9 @@ import {
   TF_INTERVAL_MS,
   type Timeframe,
 } from "./constants.ts";
+import { useOverlayLayer } from "./useOverlayLayer.ts";
+import { PatternInfoPopup, PatternLegend } from "./PatternLegend.tsx";
+import type { PatternOverlay } from "../../lib/pattern-overlays/index.ts";
 import { ChartContextMenu } from "./ChartContextMenu.tsx";
 import { IndicatorEditPopup, IndicatorLegend } from "./IndicatorLegend.tsx";
 import { ChartSettingsDialog } from "./ChartSettingsDialog.tsx";
@@ -206,6 +209,10 @@ function makeHistoryLoader(
 
 // ── Props ────────────────────────────────────────────────────
 
+const NO_OVERLAYS: DrawingLine[] = [];
+const NO_PATTERNS: PatternOverlay[] = [];
+const NO_HIDDEN: ReadonlySet<string> = new Set();
+
 export interface ChartPanelProps {
   candles: Candle[];
   selectedSymbol: string;
@@ -217,6 +224,12 @@ export interface ChartPanelProps {
   onRemoveIndicator?: (id: string) => void;
   drawingTool: DrawingTool;
   drawings: DrawingLine[];
+  /** Read-only overlays (detected patterns): rendered, never selectable or saved. */
+  overlays?: DrawingLine[];
+  /** The detected patterns behind `overlays`, for the analysis legend and info popup. */
+  patterns?: PatternOverlay[];
+  hiddenPatternIds?: ReadonlySet<string>;
+  onTogglePattern?: (id: string) => void;
   onAddDrawing: (d: DrawingLine) => void;
   onUpdateDrawing?: (d: DrawingLine) => void;
   onRemoveDrawing?: (id: string) => void;
@@ -1095,6 +1108,10 @@ export function ChartPanel({
   onRemoveIndicator,
   drawingTool,
   drawings,
+  overlays = NO_OVERLAYS,
+  patterns = NO_PATTERNS,
+  hiddenPatternIds = NO_HIDDEN,
+  onTogglePattern,
   onAddDrawing,
   onUpdateDrawing,
   onRemoveDrawing,
@@ -1160,6 +1177,26 @@ export function ChartPanel({
   // re-bind against the live chart — without it they'd capture null refs on
   // mount (the create-effect runs after them) and never attach.
   const [chartEpoch, setChartEpoch] = useState(0);
+  // Read-only analysis overlays: their own render layer, plus a details popup
+  // opened from the analysis legend or by clicking the overlay itself.
+  const [patternInfo, setPatternInfo] = useState<{ id: string; x: number; y: number } | null>(null);
+  const openPatternInfoForDrawing = useCallback(
+    (drawingId: string, x: number, y: number) => {
+      const pattern = patterns.find((p) => p.drawings.some((d) => d.id === drawingId));
+      if (pattern) setPatternInfo({ id: pattern.id, x, y });
+    },
+    [patterns],
+  );
+  useOverlayLayer({
+    chartRef,
+    candleSeriesRef,
+    chartEpoch,
+    drawings: overlays,
+    timeframe,
+    onClick: openPatternInfoForDrawing,
+    clickable: drawingTool === "none",
+  });
+  const infoPattern = patternInfo ? patterns.find((p) => p.id === patternInfo.id) : undefined;
 
   // OHLCV legend state
   const [legend, setLegend] = useState<OhlcvLegend | null>(null);
@@ -2175,6 +2212,23 @@ export function ChartPanel({
 
       {/* Chart container — cursor is managed imperatively by DrawingToolsManager */}
       <div ref={containerRef} className="w-full h-full" onContextMenu={handleChartContextMenu} />
+
+      <PatternLegend
+        patterns={patterns}
+        hiddenIds={hiddenPatternIds}
+        onToggle={(id) => onTogglePattern?.(id)}
+        onSelect={(pattern, x, y) => setPatternInfo({ id: pattern.id, x, y })}
+      />
+      {patternInfo && infoPattern && (
+        <PatternInfoPopup
+          pattern={infoPattern}
+          hidden={hiddenPatternIds.has(infoPattern.id)}
+          x={patternInfo.x}
+          y={patternInfo.y}
+          onToggle={(id) => onTogglePattern?.(id)}
+          onClose={() => setPatternInfo(null)}
+        />
+      )}
 
       {/* Active indicator rows — the reliable click target for edit/remove */}
       <IndicatorLegend
