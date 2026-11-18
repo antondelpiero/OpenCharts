@@ -22,7 +22,12 @@ function msUntilNextBarClose(timeframe: string): number {
  * without a reload. When the backend is unreachable the chart simply shows no
  * overlays: it must keep working without it.
  */
-export function usePatternOverlays(symbol: string, timeframe: string) {
+export function usePatternOverlays(
+  symbol: string,
+  timeframe: string,
+  lastBarSec: number | null,
+  isDark: boolean,
+) {
   const pair = toBinancePair(symbol);
   const query = useQuery({
     queryKey: ["pattern-overlays", pair],
@@ -34,8 +39,8 @@ export function usePatternOverlays(symbol: string, timeframe: string) {
   });
 
   const overlays = useMemo<PatternOverlay[]>(
-    () => (query.data ? toOverlays(query.data, timeframe) : []),
-    [query.data, timeframe],
+    () => (query.data ? toOverlays(query.data, timeframe, lastBarSec, isDark) : []),
+    [query.data, timeframe, lastBarSec, isDark],
   );
 
   useEffect(() => {

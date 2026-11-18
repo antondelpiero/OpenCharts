@@ -1,18 +1,20 @@
-import type { DrawingLine } from "../../pages/trading/constants";
 import type { PairAnalysis, PatternResult } from "../../services/analysis";
+import { elliottPattern } from "./elliott";
 import { fibonacciDrawing, fibonacciLevels } from "./fibonacci";
-import type { PatternLevel, PatternOverlay } from "./types";
+import type { MapContext, MappedPattern, PatternOverlay } from "./types";
 
 export type { PatternLevel, PatternOverlay } from "./types";
 
-type Mapped = { drawings: DrawingLine[]; levels: PatternLevel[] };
-
 /** Families this app can draw so far; others are ignored. */
-const MAPPERS: Record<string, (pattern: PatternResult, id: string) => Mapped | null> = {
+const MAPPERS: Record<
+  string,
+  (pattern: PatternResult, id: string, ctx: MapContext) => MappedPattern | null
+> = {
   FIBONACCI: (pattern, id) => {
     const drawing = fibonacciDrawing(pattern, `${id}:fib`);
-    return drawing ? { drawings: [drawing], levels: fibonacciLevels(drawing) } : null;
+    return drawing ? { drawings: [drawing], levels: fibonacciLevels(drawing), name: "Fibonacci" } : null;
   },
+  ELLIOT_WAVE: elliottPattern,
 };
 
 /**
@@ -35,26 +37,39 @@ function latestPerFamily(entries: PairAnalysis[]): PairAnalysis[] {
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
-/** The chart's overlays for one timeframe, from the raw analysis response. */
-export function toOverlays(entries: PairAnalysis[], timeframe: string): PatternOverlay[] {
+/**
+ * The chart's overlays for one timeframe, from the raw analysis response.
+ * `lastBarSec` (newest candle's open time) lets families project targets past
+ * the last candle; without it those projections are left out.
+ */
+export function toOverlays(
+  entries: PairAnalysis[],
+  timeframe: string,
+  lastBarSec: number | null = null,
+  isDark = true,
+): PatternOverlay[] {
+  const ctx: MapContext = { timeframe, lastBarSec, isDark };
   const overlays: PatternOverlay[] = [];
   for (const entry of latestPerFamily(entries.filter((e) => e.timeframe === timeframe))) {
     const mapper = MAPPERS[entry.patternFamily];
     if (!mapper) continue;
     (entry.analysis ?? []).forEach((pattern, index) => {
       const id = `${entry.patternFamily}:${entry.timeframe}:${entry.expiresAt}:${index}`;
-      const mapped = mapper(pattern, id);
+      const mapped = mapper(pattern, id, ctx);
       if (!mapped) return;
       overlays.push({
         id,
         family: entry.patternFamily,
         timeframe: entry.timeframe,
+        name: mapped.name,
         patternType: str(pattern.pattern_type),
-        direction: str(pattern.direction),
+        direction: mapped.direction !== undefined ? mapped.direction : str(pattern.direction),
         confidence: num(pattern.confidence),
-        patternState: str(pattern.pattern_state),
+        // Elliott patterns carry `wave_status` (completed / forming) instead.
+        patternState: str(pattern.pattern_state) ?? str(pattern.wave_status),
         expiresAt: entry.expiresAt,
         levels: mapped.levels,
+        note: mapped.note ?? null,
         drawings: mapped.drawings,
       });
     });

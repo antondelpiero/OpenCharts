@@ -1187,15 +1187,6 @@ export function ChartPanel({
     },
     [patterns],
   );
-  useOverlayLayer({
-    chartRef,
-    candleSeriesRef,
-    chartEpoch,
-    drawings: overlays,
-    timeframe,
-    onClick: openPatternInfoForDrawing,
-    clickable: drawingTool === "none",
-  });
   const infoPattern = patternInfo ? patterns.find((p) => p.id === patternInfo.id) : undefined;
 
   // OHLCV legend state
@@ -1876,6 +1867,7 @@ export function ChartPanel({
     );
   }, [timeframe]);
 
+
   // ── Refs for smooth real-time streaming ────────────────
   const lastCandleRef = useRef<CandlestickData<Time> | null>(null);
   const lastLoadKeyRef = useRef<string>("");
@@ -1951,6 +1943,20 @@ export function ChartPanel({
     replayBufferedLive(buffered, chartData, ctx);
     return scheduleStaleRefetch(chartData, ctx);
   }, [chartData, volumeData, selectedSymbol, timeframe, makeRtCtx]);
+
+  // Read-only analysis overlays. Called after the timeframe and candle-load
+  // effects above, so its right-margin adjustment for projected targets runs
+  // after their margin reset and initial scroll.
+  useOverlayLayer({
+    chartRef,
+    candleSeriesRef,
+    chartEpoch,
+    drawings: overlays,
+    timeframe,
+    lastBarSec: candles.length > 0 ? (candles[candles.length - 1]!.time as number) : null,
+    onClick: openPatternInfoForDrawing,
+    clickable: drawingTool === "none",
+  });
 
   // ── Real-time candle updates ──────────────────────────
 

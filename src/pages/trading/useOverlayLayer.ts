@@ -7,6 +7,9 @@ import { TF_INTERVAL_MS, type DrawingLine, type Timeframe } from "./constants";
 
 const intervalSecOf = (tf: Timeframe) => (TF_INTERVAL_MS[tf] ?? 60_000) / 1000;
 
+/** Right margin (bars) while an overlay is projected past the last candle. */
+const FUTURE_RIGHT_OFFSET = 20;
+
 interface OverlayLayerOptions {
   chartRef: React.RefObject<IChartApi | null>;
   candleSeriesRef: React.RefObject<ISeriesApi<"Candlestick"> | null>;
@@ -14,6 +17,8 @@ interface OverlayLayerOptions {
   chartEpoch: number;
   drawings: DrawingLine[];
   timeframe: Timeframe;
+  /** Open time (unix seconds) of the newest candle the chart is showing. */
+  lastBarSec: number | null;
   /** A click landed on an overlay drawing (viewport coordinates for anchoring a popup). */
   onClick?: (drawingId: string, clientX: number, clientY: number) => void;
   /** False while a drawing tool is armed, so placing a drawing never opens overlay info. */
@@ -37,6 +42,7 @@ export function useOverlayLayer({
   chartEpoch,
   drawings,
   timeframe,
+  lastBarSec,
   onClick,
   clickable,
 }: OverlayLayerOptions): void {
@@ -86,4 +92,38 @@ export function useOverlayLayer({
   useEffect(() => {
     primitiveRef.current?.setIntervalSec(intervalSecOf(timeframe));
   }, [timeframe]);
+
+  // Widen the right margin while something is projected into the future (e.g.
+  // Elliott target zones 5–15 bars out), and give the chart its own margin
+  // back afterwards. ChartPanel resets the margin on a timeframe change and
+  // scrolls to a fixed position on each new candle load, so this must run after
+  // both of those effects (call this hook below them). It treats whatever
+  // margin it finds as the chart's own, and only scrolls when the latest
+  // candles are in view, never pulling a user back out of history.
+  const ownRightOffset = useRef<number | null>(null);
+  useEffect(() => {
+    // `lastBarSec` comes from the candles prop rather than series.data(): in the
+    // render where new candles arrive, this effect runs before ChartPanel has
+    // pushed them into the series.
+    const chart = chartRef.current;
+    if (!chart) return;
+    const projected =
+      lastBarSec !== null &&
+      drawings.some((d) => [d.time, d.time2, d.time3].some((t) => t != null && t > lastBarSec));
+    const timeScale = chart.timeScale();
+    const current = timeScale.options().rightOffset;
+    if (projected) {
+      if (current !== FUTURE_RIGHT_OFFSET) {
+        ownRightOffset.current = current;
+        timeScale.applyOptions({ rightOffset: FUTURE_RIGHT_OFFSET });
+      }
+      const position = timeScale.scrollPosition();
+      if (position >= 0 && position < FUTURE_RIGHT_OFFSET) {
+        timeScale.scrollToPosition(FUTURE_RIGHT_OFFSET, false);
+      }
+    } else if (current === FUTURE_RIGHT_OFFSET && ownRightOffset.current !== null) {
+      timeScale.applyOptions({ rightOffset: ownRightOffset.current });
+      ownRightOffset.current = null;
+    }
+  }, [chartRef, chartEpoch, drawings, timeframe, lastBarSec]);
 }

@@ -180,24 +180,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     redo: redoDrawing,
   } = useChartDrawings(selectedSymbol, timeframe);
 
-  // ── Detected-pattern overlays (read-only, from the trading backend)
-  const { overlays: patterns } = usePatternOverlays(selectedSymbol, timeframe);
-  // Hidden patterns (session only). Ids are per analysis, so a newly run
-  // analysis shows again even if the previous one was hidden.
-  const [hiddenPatternIds, setHiddenPatternIds] = useState<ReadonlySet<string>>(() => new Set());
-  const togglePattern = useCallback((id: string) => {
-    setHiddenPatternIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-  const patternOverlays = useMemo(
-    () => patterns.filter((p) => !hiddenPatternIds.has(p.id)).flatMap((p) => p.drawings),
-    [patterns, hiddenPatternIds],
-  );
-
   // ── Trading preferences
   const [oneClick, setOneClick] = useState(
     () => safeStorage.getItem("oneClickTrading") === "true",
@@ -332,6 +314,30 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, [chartKey]);
 
   const { data: candles = [] } = useCandles(selectedSymbol, timeframe, candleLimit, replayVersion);
+
+  const isDark =
+    typeof document === "undefined"
+      ? true
+      : !document.documentElement.classList.contains("light");
+
+  // ── Detected-pattern overlays (read-only, from the trading backend)
+  const lastBarSec = candles.length > 0 ? (candles[candles.length - 1]!.time as number) : null;
+  const { overlays: patterns } = usePatternOverlays(selectedSymbol, timeframe, lastBarSec, isDark);
+  // Hidden patterns (session only). Ids are per analysis, so a newly run
+  // analysis shows again even if the previous one was hidden.
+  const [hiddenPatternIds, setHiddenPatternIds] = useState<ReadonlySet<string>>(() => new Set());
+  const togglePattern = useCallback((id: string) => {
+    setHiddenPatternIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const patternOverlays = useMemo(
+    () => patterns.filter((p) => !hiddenPatternIds.has(p.id)).flatMap((p) => p.drawings),
+    [patterns, hiddenPatternIds],
+  );
   const { replayCandles, replayTradeEvents } = useReplayChartData(activeAccountId);
   useReplayPlayback(activeAccountId ?? "");
 
@@ -449,10 +455,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     () => getPipDigits(symbolInfo, selectedSymbol),
     [symbolInfo, selectedSymbol],
   );
-  const isDark =
-    typeof document === "undefined"
-      ? true
-      : !document.documentElement.classList.contains("light");
 
   const value: TerminalContextValue = {
     selectedSymbol,

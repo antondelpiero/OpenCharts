@@ -3,14 +3,6 @@ import { Eye, EyeOff, X } from "lucide-react";
 import type { PatternOverlay } from "../../lib/pattern-overlays";
 import { cn } from "../../lib/utils.ts";
 
-const FAMILY_LABELS: Record<string, string> = {
-  FIBONACCI: "Fibonacci",
-  ELLIOT_WAVE: "Elliott Wave",
-  RANGE: "Range",
-  WEDGE: "Wedge",
-};
-
-const familyLabel = (family: string) => FAMILY_LABELS[family] ?? family;
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 /** "AT_LEVEL" → "At level" */
 const humanize = (s: string) => capitalize(s.replace(/_/g, " "));
@@ -63,7 +55,7 @@ export function PatternLegend({ patterns, hiddenIds, onToggle, onSelect }: Legen
             title="Click for details"
           >
             <span className="text-[11px] font-mono leading-none">
-              {familyLabel(pattern.family)}
+              {pattern.name}
               {pattern.direction && (
                 <span className={cn("ml-1", directionClass(pattern.direction))}>
                   {capitalize(pattern.direction)}
@@ -137,7 +129,7 @@ export function PatternInfoPopup({ pattern, hidden, x, y, onToggle, onClose }: I
       <div className="flex items-start gap-2 mb-2">
         <div className="flex-1 min-w-0">
           <div className="font-medium">
-            {familyLabel(pattern.family)} · {pattern.timeframe}
+            {pattern.name} · {pattern.timeframe}
           </div>
           {pattern.patternType && (
             <div className="text-[10px] font-mono text-muted-foreground truncate">{pattern.patternType}</div>
@@ -159,13 +151,19 @@ export function PatternInfoPopup({ pattern, hidden, x, y, onToggle, onClose }: I
 
       {pattern.levels.length > 0 && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 mt-2 pt-2 border-t border-border">
-          {pattern.levels.map((level) => (
-            <div key={level.label} className="contents">
+          {pattern.levels.map((level, i) => (
+            <div key={`${level.label}:${i}`} className="contents">
               <dt className="text-muted-foreground">{level.label}</dt>
               <dd className="text-right font-mono">{formatPrice(level.price)}</dd>
             </div>
           ))}
         </dl>
+      )}
+
+      {pattern.note && (
+        <p className="mt-2 pt-2 border-t border-border text-[11px] leading-snug text-muted-foreground">
+          {pattern.note}
+        </p>
       )}
 
       <div className="flex items-center justify-between mt-2.5">
