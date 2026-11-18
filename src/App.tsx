@@ -6,7 +6,7 @@ import { useAuthStore, useTradingStore } from "./services/store.tsx";
  * OpenCharts entry point.
  *
  * No auth / routing: the app boots straight into the trading terminal backed by
- * the in-browser demo session (real bundled OHLC + paper-trading engine). A
+ * the in-browser demo session (live Binance market data + paper-trading engine). A
  * demo "login" seeds the local user/account and starts the market-data feed.
  */
 export function App() {

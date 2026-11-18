@@ -10,14 +10,15 @@ import type { Candle } from "../schemas.ts";
 
 /** The real endpoint's payload, so the demo stub can't drift from its shape. */
 type ReplaySessionResponse = Awaited<ReturnType<typeof accountsApi.replayGetSession>>;
-import { getHistory } from "./candles.ts";
+import { toExchangePair } from "../../lib/symbols.ts";
+import { fetchKlineRange, fetchRecentKlines } from "../market/binance.ts";
 import * as engine from "./engine.ts";
 import { DEMO_SYMBOLS } from "./instruments.ts";
 
 /**
  * Demo-mode API. Replaces the HTTP client for everything the terminal needs:
- * trading actions hit the in-browser paper engine, market data comes from the
- * bundled real OHLC, and chart drawings persist to localStorage. Methods not
+ * trading actions hit the in-browser paper engine, market data comes live from
+ * Binance's public API, and chart drawings persist to localStorage. Methods not
  * implemented here fall through to a benign stub (see services/api.ts).
  */
 
@@ -74,6 +75,8 @@ const chartDrawings = {
  * optional in the schema but required by `MarketDataCandle`, so derive it from
  * `time` (seconds → ms) rather than leaving consumers to guess.
  */
+const DEFAULT_CANDLE_LIMIT = 1000;
+
 const candlesMeta = (candles: Candle[]): MarketDataCandlesPayload => ({
   candles: candles.map((c) => ({ ...c, timestamp: c.timestamp ?? c.time * 1000 })),
   metadata: { isPartial: false, backfillQueued: false, historicalCoverageStart: null },
@@ -146,24 +149,24 @@ export const demoApi = {
   getSymbols: () => Promise.resolve(DEMO_SYMBOLS),
   /**
    * `range` backs the chart's "load more history" scroll: ChartPanel asks for
-   * an explicit window rather than a bar count. Honour it by slicing the demo
-   * series to that window — ignoring it would return the same recent bars and
-   * leave the chart appearing to have no earlier history.
+   * an explicit window rather than a bar count, so honour it with a time-range
+   * query instead of returning the same recent bars.
    */
   getCandles: (
     symbol: string,
     timeframe: string,
     limit?: number,
     range?: { fromMs: number; toMs: number },
-  ) => {
-    const bars = getHistory(symbol, timeframe, range ? undefined : limit);
-    if (!range) return Promise.resolve(bars);
-    const fromSec = range.fromMs / 1000;
-    const toSec = range.toMs / 1000;
-    return Promise.resolve(bars.filter((c) => c.time >= fromSec && c.time <= toSec));
+  ): Promise<Candle[]> => {
+    const pair = toExchangePair(symbol);
+    return range
+      ? fetchKlineRange(pair, timeframe, range.fromMs, range.toMs)
+      : fetchRecentKlines(pair, timeframe, limit ?? DEFAULT_CANDLE_LIMIT);
   },
   getCandlesWithMeta: (symbol: string, timeframe: string, limit?: number) =>
-    Promise.resolve(candlesMeta(getHistory(symbol, timeframe, limit))),
+    fetchRecentKlines(toExchangePair(symbol), timeframe, limit ?? DEFAULT_CANDLE_LIMIT).then(
+      candlesMeta,
+    ),
   getTick: (symbol: string) => {
     const price = engine.getLastPrice(symbol);
     return Promise.resolve({ symbol, bid: price, ask: price, timestamp: Date.now() });

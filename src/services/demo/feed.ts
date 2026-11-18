@@ -1,53 +1,57 @@
+import { toExchangePair } from "../../lib/symbols.ts";
+import { fetchPrices } from "../market/binance.ts";
 import { publish } from "./bus.ts";
-import { getTickPrices } from "./candles.ts";
 import { mark } from "./engine.ts";
 import { DEMO_SYMBOLS } from "./instruments.ts";
 
 /**
- * Demo market-data feed. Replays the bundled REAL 1m closes for every symbol
- * as a forward-moving tick stream at the current wall-clock time, so the chart
- * and watchlist look live while every price is genuine market data. Drives the
- * paper-trading engine's mark-to-market via engine.mark().
+ * Market-data feed. Polls Binance's latest price for every symbol in one
+ * request and publishes it as a `MarketTick`, which drives the watchlist, the
+ * chart's forming candle and the paper engine's mark-to-market (engine.mark).
+ *
+ * Deliberately not tick-by-tick: one request a minute keeps every consumer on
+ * current prices. Completed candles are refreshed separately, at each bar close
+ * (see useCandles).
  */
 
-const TICK_MS = 600;
-
-type SymbolCursor = { symbol: string; prices: number[]; index: number; spread: number };
+const POLL_MS = 60_000;
 
 let timer: ReturnType<typeof setInterval> | null = null;
-let cursors: SymbolCursor[] = [];
 
-function buildCursors(): SymbolCursor[] {
-  return DEMO_SYMBOLS.map((s) => {
-    const prices = getTickPrices(s.name);
-    const seed = prices[prices.length - 1] ?? 0;
-    return { symbol: s.name, prices, index: 0, spread: Math.max(s.tickSize, seed * 0.0001) };
-  });
-}
+const SYMBOLS = DEMO_SYMBOLS.map((s) => ({
+  symbol: s.name,
+  pair: toExchangePair(s.name),
+  tickSize: s.tickSize,
+}));
 
-function emitTick(cursor: SymbolCursor): void {
-  if (cursor.prices.length === 0) return;
-  const price = cursor.prices[cursor.index]!;
-  cursor.index = (cursor.index + 1) % cursor.prices.length;
-  const half = cursor.spread / 2;
-  publish("market-data", {
-    eventType: "MarketTick",
-    symbol: cursor.symbol,
-    bid: price - half,
-    ask: price + half,
-    occurredAt: Date.now(),
-  });
-  mark(cursor.symbol, price);
+async function poll(): Promise<void> {
+  let prices: Map<string, number>;
+  try {
+    prices = await fetchPrices(SYMBOLS.map((s) => s.pair));
+  } catch (err) {
+    // Keep the last known prices; the next poll retries.
+    console.warn("[feed] price poll failed", err);
+    return;
+  }
+  for (const s of SYMBOLS) {
+    const price = prices.get(s.pair);
+    if (price === undefined) continue;
+    const half = Math.max(s.tickSize, price * 0.0001) / 2;
+    publish("market-data", {
+      eventType: "MarketTick",
+      symbol: s.symbol,
+      bid: price - half,
+      ask: price + half,
+      occurredAt: Date.now(),
+    });
+    mark(s.symbol, price);
+  }
 }
 
 export function startDemoFeed(): void {
   if (timer) return;
-  cursors = buildCursors();
-  // Seed an initial price for every symbol so panels render immediately.
-  for (const c of cursors) emitTick(c);
-  timer = setInterval(() => {
-    for (const c of cursors) emitTick(c);
-  }, TICK_MS);
+  void poll();
+  timer = setInterval(() => void poll(), POLL_MS);
 }
 
 export function stopDemoFeed(): void {

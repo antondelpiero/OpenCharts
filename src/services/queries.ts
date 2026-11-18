@@ -3,6 +3,7 @@ import { api } from "./api";
 import type { AllPayoutsResponse } from "./api/accounts";
 import type { JournalEntriesResponse } from "./api/journal";
 import type { MarketDataCandlesPayload } from "./api/market-data";
+import { msUntilBarClose } from "../lib/barClose";
 import type { PnlCalendarResponse } from "@propsim/types";
 import type {
   Account,
@@ -267,9 +268,18 @@ export function useCandles(
     // → deep limit causes a momentary empty array, which lets a live WS candle
     // paint as the only bar before history arrives.
     placeholderData: (prev) => prev,
-    // When the server signals the response is partial (backfill queued), poll
-    // at 3 s until data fills in. Otherwise use the 5-min safety-net cadence.
-    refetchInterval: (query) => (query.state.data?.metadata?.isPartial ? 3_000 : 5 * 60_000),
+    // Partial response (backfill queued): poll at 3 s until it fills in.
+    // Otherwise refetch when the newest bar closes, so a 15m chart refreshes
+    // every 15 min on the boundary, 1h hourly, and so on. Between closes the
+    // forming bar moves with the market-data price ticks.
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data?.metadata?.isPartial) return 3_000;
+      const last = data?.candles[data.candles.length - 1];
+      return last ? msUntilBarClose(last.time, timeframe) : 5 * 60_000;
+    },
+    // Interval timers pause while the tab is hidden; catch up on return.
+    refetchOnWindowFocus: true,
   });
 }
 

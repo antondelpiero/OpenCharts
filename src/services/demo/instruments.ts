@@ -1,8 +1,8 @@
 import type { Symbol } from "../schemas.ts";
 
 /**
- * Demo instruments. These mirror the crypto pairs whose real historical OHLC
- * is bundled under ./data (see scripts/fetch-demo-data.mjs). Quoted in USD.
+ * Demo instruments: crypto pairs whose live market data comes from Binance
+ * (pair mapping in lib/symbols.ts). Quoted in USD.
  */
 function crypto(name: string, displayName: string, tickSize: number): Symbol {
   return {

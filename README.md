@@ -22,7 +22,7 @@ Advanced charting · full drawing-tool suite · 8 indicators · watchlist · dep
 - [Built on Lightweight Charts](#built-on-lightweight-charts)
 - [Project structure](#project-structure)
 - [Building on OpenCharts](#building-on-opencharts)
-- [Refreshing the bundled market data](#refreshing-the-bundled-market-data)
+- [Market data](#market-data)
 - [Bring your own data / backend](#bring-your-own-data--backend)
 - [Adding instruments](#adding-instruments)
 - [Configuration](#configuration)
@@ -103,7 +103,7 @@ toolbar and removable individually or in bulk from the chart context menu.
 - Drawings persist per symbol in `localStorage` and survive reloads.
 
 ### 📋 Watchlist · DOM · order ticket
-- **Watchlist** with live prices across all bundled instruments.
+- **Watchlist** with live prices across all instruments.
 - **Depth-of-market ladder** around the live mid price.
 - **Order ticket**: market / limit / stop tickets with volume presets,
   take-profit and stop-loss, one-click trade mode and an order confirmation
@@ -154,10 +154,10 @@ marketing copy:
 
 | Piece | Status |
 | --- | --- |
-| OHLC history (6 crypto pairs × 8 timeframes) | **Real** Binance klines, bundled as JSON |
-| Tick feed | **Real** 1m closes, replayed on a 600 ms loop and looped when exhausted |
-| Bar timestamps | **Shifted** so the last real bar lands on the current period |
-| Bid/ask spread | **Derived** — synthesized around the replayed close |
+| OHLC history (6 crypto pairs × 8 timeframes) | **Real** and live — Binance klines fetched in the browser, refreshed at each bar close |
+| Prices / tick feed | **Real** — latest Binance price for every symbol, polled once a minute |
+| Bar timestamps | **Real** |
+| Bid/ask spread | **Derived** — synthesized around the latest price |
 | DOM ladder sizes | **Synthetic** — random sizes around the real mid price |
 | Order fills, positions, P&L, margin | Real arithmetic against the in-browser engine |
 | Limit / stop orders | Accepted by the ticket but **fill immediately** — there is no resting-order book |
@@ -189,22 +189,24 @@ this repo both are implemented by a small in-browser **demo layer**:
                 │                services/demo/                    │
                 │  api.ts      demo method table (+ benign fallback)│
                 │  engine.ts   paper trading (positions, P&L, SL/TP)│
-                │  feed.ts     replays real ticks → bus → store     │
-                │  candles.ts  serves bundled OHLC (shifted to now) │
+                │  feed.ts     Binance prices (60 s) → bus → store  │
                 │  bus.ts      in-process pub/sub                   │
-                │  instruments.ts / data/  real OHLC + symbol specs │
+                │  instruments.ts  symbol specs                     │
+                └───────────────────────┬──────────────────────────┘
+                                        │ candles + prices
+                ┌───────────────────────▼──────────────────────────┐
+                │  services/market/binance.ts  Binance public API   │
                 └──────────────────────────────────────────────────┘
 ```
 
 - **`services/demo/engine.ts`** — the paper-trading engine and single source of
   truth for the account, positions and orders. It marks positions to market and
   publishes the same position / order / equity events the UI already consumed.
-- **`services/demo/feed.ts`** — replays the bundled 1-minute closes for every
-  symbol as a forward-moving tick stream, every 600 ms, and drives
-  `engine.mark()`.
-- **`services/demo/candles.ts`** — serves the bundled history, time-shifted so
-  the most recent bar aligns to "now" (OHLC values stay real; only the timeline
-  is normalized).
+- **`services/demo/feed.ts`** — polls Binance's latest price for every symbol
+  once a minute, publishes it as `MarketTick` events and drives `engine.mark()`.
+- **`services/market/binance.ts`** — browser client for Binance's public market
+  data (klines + prices). `getCandles` / `getCandlesWithMeta` use it; candles
+  refresh when the newest bar closes (`useCandles`, `lib/barClose.ts`).
 - **`services/api.ts`** — wraps the demo method table in a `Proxy` whose fallback
   resolves any unimplemented method to `null`, so leftover calls from the
   platform this was extracted from never throw.
@@ -294,11 +296,10 @@ src/
 │  ├─ queries.ts            # TanStack Query hooks
 │  ├─ store.tsx             # zustand stores (auth + trading state)
 │  ├─ schemas.ts            # zod schemas / shared types
-│  └─ demo/                 # engine, feed, candles, bus, instruments, bundled data
+│  ├─ market/binance.ts     # Binance public market data (candles, prices)
+│  └─ demo/                 # engine, feed, bus, instruments
 ├─ __tests__/               # Vitest unit tests
 └─ styles/
-scripts/
-└─ fetch-demo-data.mjs      # refresh the bundled real OHLC
 ```
 
 ## Building on OpenCharts
@@ -373,18 +374,22 @@ six plugins are the reference implementations.
 - **The demo engine is in-memory.** Anything you want to survive a reload has to
   be written to `localStorage` (or a backend you wire up yourself).
 
-## Refreshing the bundled market data
+## Market data
 
-The demo OHLC lives in `src/services/demo/data/` as JSON, fetched from the public
-**Binance klines** endpoint (no API key required):
+Candles and prices come live from **Binance's public market-data API**
+(`data-api.binance.vision`), fetched directly by the browser: no API key, no
+backend, and rate limits count against each viewer's own IP.
 
-```bash
-node scripts/fetch-demo-data.mjs
-```
+- **Candles** load on demand (paged past Binance's 1000-bar limit) and refresh
+  when the newest bar closes: every 15 minutes on a 15m chart, hourly on 1h,
+  and so on. Hidden tabs catch up when they become visible again.
+- **Prices** for every symbol are polled in one request per minute; they move
+  the forming candle, the watchlist and the paper engine.
 
-This re-pulls up to 1000 bars per symbol per timeframe and rewrites the bundled files
-plus `data/manifest.json`. The candles are genuine market history — OpenCharts
-never ships synthetic OHLC.
+The terminal's `BTCUSD`-style names map to Binance pairs in `src/lib/symbols.ts`.
+`data-api.binance.vision` is used instead of `api.binance.com` because the latter
+is geo-blocked in some regions (including the US). Without network access to
+Binance the chart has no data.
 
 ## Bring your own data / backend
 
@@ -404,7 +409,8 @@ against your APIs — the rest of the app is untouched:
 
 Two leftovers from the original platform help if you go this route:
 `src/services/api/request.ts` is a working HTTP client with token refresh, and
-the Vite dev server already proxies `/api` and `/ws` to `http://localhost:3000`.
+the Vite dev server proxies `/api` to `http://localhost:3004` and `/ws` to
+`http://localhost:3000`.
 
 ## Adding instruments
 
@@ -412,8 +418,7 @@ Demo instruments are defined in `src/services/demo/instruments.ts` (currently
 BTCUSD, ETHUSD, SOLUSD, BNBUSD, XRPUSD and ADAUSD). To add one:
 
 1. Add a `Symbol` entry (name, tick size, contract size, etc.).
-2. Add its trading pair to the `SYMBOLS` map in `scripts/fetch-demo-data.mjs`.
-3. Run `node scripts/fetch-demo-data.mjs` to fetch and bundle its history.
+2. Map it to its Binance pair in `src/lib/symbols.ts`.
 
 ## Configuration
 
@@ -441,7 +446,6 @@ network requests. Drop those components if you want a strictly offline build.
 | `npm run test` | Run the Vitest unit tests |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run lint` | Runs `eslint src/` — ESLint is **not** currently a declared dependency, so install it first |
-| `node scripts/fetch-demo-data.mjs` | Refresh bundled real OHLC |
 
 ## Tech stack
 
@@ -465,11 +469,10 @@ React Router only supplies a `BrowserRouter` wrapper — there are no routes.
   `cancelAllOrders` are no-ops.
 - **Account state is ephemeral** — positions, orders and balance reset on reload.
   Drawings, chart preferences and templates persist via `localStorage`.
-- **Timeline is normalized** — bundled history is shifted so the latest bar is
-  "now", and the tick replay loops when it reaches the end of the 1m series.
-  OHLC values are real; the timestamps are remapped to feel live.
-- **The DOM ladder is synthetic** — real mid price, random sizes. There is no
-  order book in the bundled data.
+- **Prices update once a minute**, not tick-by-tick, so the forming candle and
+  paper P&L move in one-minute steps.
+- **The DOM ladder is synthetic** — real mid price, random sizes. No order book
+  data is fetched.
 - **Crypto-only demo symbols** out of the box (the data source is Binance). Wire
   your own adapter for FX, futures or equities.
 - **Dormant code from the original platform** ships in the repo: session replay
