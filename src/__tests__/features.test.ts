@@ -97,6 +97,18 @@ describe("trade journal persistence", () => {
 describe("session replay", () => {
   const today = toLocalDateString();
 
+  // The replay window is "today until now", so its size depends on the time of
+  // day: right after midnight it holds only a few bars. Pin the clock to noon
+  // of the same day (faking Date only; real timers keep running) so these
+  // tests see ~12h of bars whenever they run.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${today}T12:00:00`));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("builds a session from the bundled 1m history", async () => {
     const session = await replay.getSession(today);
     expect(session.tickBuffer.length).toBeGreaterThan(0);
@@ -157,6 +169,20 @@ describe("session replay", () => {
     const last = session.tickBuffer[session.tickBuffer.length - 1]!.t;
     expect(started?.cursorTimestamp).toBeGreaterThan(first);
     expect(started?.cursorTimestamp).toBeLessThan(last);
+  });
+
+  it("starts inside a short session too (e.g. just after midnight), not on its last bar", async () => {
+    vi.setSystemTime(new Date(`${today}T00:05:00`));
+    const session = await replay.getSession(today);
+    expect(session.tickBuffer.length).toBeGreaterThanOrEqual(3);
+    expect(session.tickBuffer.length).toBeLessThan(31); // shorter than the warm-up
+    const events: Array<{ action?: string; cursorTimestamp?: number }> = [];
+    subscribeChannel("market-data", (e) => events.push(e as never));
+
+    await replay.start(today, 1);
+    const started = events.find((e) => e.action === "started");
+    expect(started?.cursorTimestamp).toBeGreaterThan(session.tickBuffer[0]!.t);
+    expect(started?.cursorTimestamp).toBeLessThan(session.tickBuffer[session.tickBuffer.length - 1]!.t);
   });
 
   it("includes closed trades from the replayed window as markers", async () => {

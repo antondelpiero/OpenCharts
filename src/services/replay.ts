@@ -151,8 +151,13 @@ export async function start(
 ): Promise<{ speed: number; seed: null }> {
   const payload = await getSession(sessionDate, symbol, accountId);
   const buffer = payload.tickBuffer;
+  // Warm up by WARMUP_BARS, but never past the middle: a short session (e.g.
+  // today, just after midnight) would otherwise start on its last bar and have
+  // nothing left to play.
   const first =
-    buffer.length > 0 ? (buffer[Math.min(WARMUP_BARS, buffer.length - 1)]?.t ?? null) : null;
+    buffer.length > 0
+      ? (buffer[Math.min(WARMUP_BARS, Math.floor(buffer.length / 2))]?.t ?? null)
+      : null;
 
   session = { id: uid(), status: "PLAYING", speed, cursorTimestamp: first, sessionDate };
   emit("started", { speed, ...(first != null ? { cursorTimestamp: first } : {}) });
