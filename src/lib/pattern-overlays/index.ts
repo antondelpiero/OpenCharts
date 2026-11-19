@@ -2,6 +2,7 @@ import type { PairAnalysis, PatternResult } from "../../services/analysis";
 import { elliottPattern } from "./elliott";
 import { fibonacciDrawing, fibonacciLevels } from "./fibonacci";
 import { rangePattern } from "./range";
+import { wedgePattern } from "./wedge";
 import type { MapContext, MappedPattern, PatternOverlay } from "./types";
 
 export type { PatternLevel, PatternOverlay } from "./types";
@@ -17,6 +18,7 @@ const MAPPERS: Record<
   },
   ELLIOT_WAVE: elliottPattern,
   RANGE: rangePattern,
+  WEDGE: wedgePattern,
 };
 
 /**

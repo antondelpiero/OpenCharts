@@ -3,6 +3,7 @@ import type { PatternResult } from "../../services/analysis";
 import {
   DIRECTION_COLOR,
   DIRECTION_LABEL_DARK,
+  INVALIDATION_COLOR,
   PROJECT_GAP_BARS,
   PROJECT_WIDTH_BARS,
   finite,
@@ -33,7 +34,6 @@ const DEGREE_STYLE: Record<string, { width: number; zIndex: number }> = {
 };
 const OTHER_DEGREE = { width: 2, zIndex: 3 };
 
-const INVALIDATION_COLOR = "#ef4444";
 interface Wave {
   key: string;
   start: Point;

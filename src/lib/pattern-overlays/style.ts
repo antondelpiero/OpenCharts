@@ -27,6 +27,9 @@ export function withHalo(line: DrawingLine, isDark: boolean): DrawingLine[] {
   return [halo, line];
 }
 
+/** Invalidation / stop levels. */
+export const INVALIDATION_COLOR = "#ef4444";
+
 /** Wave-label background boxes, matched to the chart theme. */
 export const LABEL_BG = { dark: "#1e222d", light: "#ffffff" } as const;
 
