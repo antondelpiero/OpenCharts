@@ -57,6 +57,16 @@ export function PatternsPanel({
   expired,
 }: PatternsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Collapsed timeframe groups, keyed "live:1d" / "expired:4h" so the two
+  // lists collapse independently.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const rowProps = {
     hiddenIds,
     expanded,
@@ -87,7 +97,13 @@ export function PatternsPanel({
           </p>
         ) : (
           groupByTimeframe(patterns, leadingTimeframe).map((group) => (
-            <GroupSection key={group.timeframe} group={group} {...rowProps} />
+            <GroupSection
+              key={group.timeframe}
+              group={group}
+              collapsed={collapsed.has(`live:${group.timeframe}`)}
+              onCollapse={() => toggleGroup(`live:${group.timeframe}`)}
+              {...rowProps}
+            />
           ))
         )}
 
@@ -120,7 +136,13 @@ export function PatternsPanel({
                     Hidden on the chart by default; use the eye to show one.
                   </p>
                   {groupByTimeframe(expired.patterns, leadingTimeframe).map((group) => (
-                    <GroupSection key={group.timeframe} group={group} {...rowProps} />
+                    <GroupSection
+                      key={group.timeframe}
+                      group={group}
+                      collapsed={collapsed.has(`expired:${group.timeframe}`)}
+                      onCollapse={() => toggleGroup(`expired:${group.timeframe}`)}
+                      {...rowProps}
+                    />
                   ))}
                   {expired.hasMore && (
                     <button
@@ -147,16 +169,32 @@ interface RowProps {
   onToggle: (id: string) => void;
 }
 
-/** One timeframe's header and its pattern rows. */
-function GroupSection({ group, ...row }: RowProps & { group: TimeframeGroup }) {
+interface GroupProps extends RowProps {
+  group: TimeframeGroup;
+  collapsed: boolean;
+  onCollapse: () => void;
+}
+
+/** One timeframe's header (click to collapse) and its pattern rows. */
+function GroupSection({ group, collapsed, onCollapse, ...row }: GroupProps) {
   return (
     <section className="border-b border-border">
-      <div className="px-3 py-1.5 bg-card sticky top-0 z-10">
+      <button
+        className="w-full flex items-center gap-1.5 px-3 py-1.5 bg-card sticky top-0 z-10 text-left hover:bg-accent/40"
+        onClick={onCollapse}
+        aria-expanded={!collapsed}
+        title={collapsed ? `Show ${group.timeframe} patterns` : `Collapse ${group.timeframe} patterns`}
+      >
+        {collapsed ? (
+          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        )}
         <span className="text-[11px] font-semibold uppercase tracking-wider">{group.timeframe}</span>
-      </div>
-      {group.patterns.map((pattern) => (
-        <PatternRow key={pattern.id} pattern={pattern} {...row} />
-      ))}
+        <span className="text-[10px] text-muted-foreground">({group.patterns.length})</span>
+      </button>
+      {!collapsed &&
+        group.patterns.map((pattern) => <PatternRow key={pattern.id} pattern={pattern} {...row} />)}
     </section>
   );
 }
