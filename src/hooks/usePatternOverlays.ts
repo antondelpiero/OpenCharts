@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 import { toBinancePair } from "../../examples/binance-adapter/binance-adapter";
 import { msUntilBarClose } from "../lib/barClose";
 import { toOverlays, type PatternOverlay } from "../lib/pattern-overlays";
+import { overlayTimeframe } from "../lib/pattern-overlays/group";
 import { TF_INTERVAL_MS, type Timeframe } from "../pages/trading/constants";
 import { getPairAnalyses } from "../services/analysis";
 
@@ -15,7 +16,9 @@ function msUntilNextBarClose(timeframe: string): number {
 
 /**
  * The trading backend's detected patterns for the charted symbol and timeframe,
- * as read-only chart overlays.
+ * as read-only chart overlays. Without detections on the charted timeframe,
+ * the closest larger timeframe that has some is drawn instead (`timeframe` in
+ * the result says which one, null when none).
  *
  * One request covers every timeframe of the pair; switching timeframe only
  * re-filters. Refetches after each bar close so a newly run analysis appears
@@ -38,24 +41,31 @@ export function usePatternOverlays(
     refetchInterval: () => msUntilNextBarClose(timeframe),
   });
 
+  const shownTimeframe = useMemo(
+    () => (query.data ? overlayTimeframe(query.data.map((e) => e.timeframe), timeframe) : null),
+    [query.data, timeframe],
+  );
   const overlays = useMemo<PatternOverlay[]>(
-    () => (query.data ? toOverlays(query.data, timeframe, lastBarSec, isDark) : []),
-    [query.data, timeframe, lastBarSec, isDark],
+    () =>
+      query.data && shownTimeframe
+        ? toOverlays(query.data, shownTimeframe, lastBarSec, isDark, timeframe)
+        : [],
+    [query.data, shownTimeframe, timeframe, lastBarSec, isDark],
   );
 
-  // Every timeframe's patterns, for the patterns panel. Only the charted
-  // timeframe knows its last candle, so only its projections are drawn.
+  // Every timeframe's patterns, for the patterns panel. Only the drawn
+  // timeframe knows the chart's last candle, so only its projections are drawn.
   const allOverlays = useMemo<PatternOverlay[]>(() => {
     if (!query.data) return [];
     const timeframes = [...new Set(query.data.map((e) => e.timeframe))];
     return timeframes.flatMap((tf) =>
-      tf === timeframe ? overlays : toOverlays(query.data, tf, null, isDark),
+      tf === shownTimeframe ? overlays : toOverlays(query.data, tf, null, isDark),
     );
-  }, [query.data, timeframe, overlays, isDark]);
+  }, [query.data, shownTimeframe, overlays, isDark]);
 
   useEffect(() => {
     if (query.error) console.warn("[pattern-overlays] analysis unavailable:", query.error.message);
   }, [query.error]);
 
-  return { overlays, allOverlays, isLoading: query.isLoading, error: query.error };
+  return { overlays, timeframe: shownTimeframe, allOverlays, isLoading: query.isLoading, error: query.error };
 }

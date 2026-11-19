@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupByTimeframe } from "../lib/pattern-overlays/group";
+import { groupByTimeframe, overlayTimeframe } from "../lib/pattern-overlays/group";
 import type { PatternOverlay } from "../lib/pattern-overlays/types";
 
 const p = (timeframe: string, id = timeframe): PatternOverlay => ({
@@ -43,5 +43,27 @@ describe("groupByTimeframe", () => {
 
   it("puts unknown timeframes last", () => {
     expect(order(groupByTimeframe([p("3d"), p("1h"), p("1d")], null))).toEqual(["1d", "1h", "3d"]);
+  });
+});
+
+describe("overlayTimeframe", () => {
+  it("uses the charted timeframe when it has patterns", () => {
+    expect(overlayTimeframe(["15m", "1h", "1d"], "15m")).toBe("15m");
+  });
+
+  it("falls back to the closest larger timeframe with patterns", () => {
+    expect(overlayTimeframe(["1h", "1d"], "15m")).toBe("1h");
+    expect(overlayTimeframe(["4h", "1d"], "15m")).toBe("4h");
+    expect(overlayTimeframe(["1d", "1w"], "1h")).toBe("1d");
+  });
+
+  it("never falls back to a smaller timeframe", () => {
+    expect(overlayTimeframe(["15m", "1h"], "4h")).toBeNull();
+    expect(overlayTimeframe(["1d"], "1w")).toBeNull();
+  });
+
+  it("returns null without patterns or for an unknown timeframe", () => {
+    expect(overlayTimeframe([], "15m")).toBeNull();
+    expect(overlayTimeframe(["1d"], "3d")).toBeNull();
   });
 });

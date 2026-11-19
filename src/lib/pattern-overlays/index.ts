@@ -67,17 +67,20 @@ function mapEntry(entry: PairAnalysis, ctx: MapContext, expired: boolean): Patte
 }
 
 /**
- * The chart's overlays for one timeframe, from the raw analysis response.
+ * The overlays of one timeframe's analyses, from the raw analysis response.
  * `lastBarSec` (newest candle's open time) lets families project targets past
- * the last candle; without it those projections are left out.
+ * the last candle; without it those projections are left out. `chartTimeframe`
+ * is the timeframe being charted when it differs (a larger timeframe's patterns
+ * shown on a smaller chart), so projections are spaced in its bars.
  */
 export function toOverlays(
   entries: PairAnalysis[],
   timeframe: string,
   lastBarSec: number | null = null,
   isDark = true,
+  chartTimeframe = timeframe,
 ): PatternOverlay[] {
-  const ctx: MapContext = { timeframe, lastBarSec, isDark };
+  const ctx: MapContext = { timeframe: chartTimeframe, lastBarSec, isDark };
   return latestPerFamily(entries.filter((e) => e.timeframe === timeframe)).flatMap((entry) =>
     mapEntry(entry, ctx, false),
   );

@@ -89,6 +89,8 @@ export interface TerminalContextValue {
   allPatterns: PatternOverlay[];
   /** Timeframe the patterns panel lists first (charted one, or last charted one with patterns). */
   leadingPatternTimeframe: string | null;
+  /** Timeframe whose patterns are drawn: the charted one, or the larger one standing in for it. */
+  patternTimeframe: string | null;
   patternsLoading: boolean;
   /** The analysis backend could not be reached. */
   patternsUnavailable: boolean;

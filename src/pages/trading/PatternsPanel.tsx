@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Eye, EyeOff, LineChart } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
 import type { PatternOverlay } from "../../lib/pattern-overlays";
 import { capitalize, directionClass, humanize, percent } from "../../lib/pattern-overlays/format";
 import { groupByTimeframe, type TimeframeGroup } from "../../lib/pattern-overlays/group";
 import { cn } from "../../lib/utils.ts";
-import type { Timeframe } from "./constants";
 import { PatternDetails } from "./PatternLegend.tsx";
 
 interface ExpiredSection {
@@ -23,8 +22,6 @@ interface PatternsPanelProps {
   symbol: string;
   /** Every currently valid pattern for the symbol, across all timeframes. */
   patterns: PatternOverlay[];
-  /** The timeframe the chart is showing. */
-  timeframe: Timeframe;
   /** Timeframe whose group is listed first. */
   leadingTimeframe: string | null;
   hiddenIds: ReadonlySet<string>;
@@ -32,8 +29,6 @@ interface PatternsPanelProps {
   /** The analysis backend could not be reached. */
   unavailable: boolean;
   onToggle: (id: string) => void;
-  /** Switch the chart to a pattern's timeframe. */
-  onShowTimeframe: (timeframe: Timeframe) => void;
   expired: ExpiredSection;
 }
 
@@ -48,30 +43,25 @@ function relativeTime(iso: string): string {
 /**
  * Right-panel list of everything the trading backend detected for the symbol,
  * grouped by timeframe, the one being looked at first. A row expands to the
- * same details as the chart popup; patterns on another timeframe can be
- * brought onto the chart from here. Expired analyses sit in a collapsed
+ * same details as the chart popup. Expired analyses sit in a collapsed
  * section at the bottom, loaded page by page when opened.
  */
 export function PatternsPanel({
   symbol,
   patterns,
-  timeframe,
   leadingTimeframe,
   hiddenIds,
   loading,
   unavailable,
   onToggle,
-  onShowTimeframe,
   expired,
 }: PatternsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const rowProps = {
-    timeframe,
     hiddenIds,
     expanded,
     onExpand: setExpanded,
     onToggle,
-    onShowTimeframe,
   };
 
   return (
@@ -151,33 +141,18 @@ export function PatternsPanel({
 }
 
 interface RowProps {
-  timeframe: Timeframe;
   hiddenIds: ReadonlySet<string>;
   expanded: string | null;
   onExpand: (id: string | null) => void;
   onToggle: (id: string) => void;
-  onShowTimeframe: (timeframe: Timeframe) => void;
 }
 
-/** One timeframe's header ("on chart" / "Show on chart") and its pattern rows. */
+/** One timeframe's header and its pattern rows. */
 function GroupSection({ group, ...row }: RowProps & { group: TimeframeGroup }) {
-  const onChart = group.timeframe === row.timeframe;
   return (
     <section className="border-b border-border">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-card sticky top-0 z-10">
+      <div className="px-3 py-1.5 bg-card sticky top-0 z-10">
         <span className="text-[11px] font-semibold uppercase tracking-wider">{group.timeframe}</span>
-        {onChart ? (
-          <span className="text-[10px] text-primary">on chart</span>
-        ) : (
-          <button
-            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
-            onClick={() => row.onShowTimeframe(group.timeframe as Timeframe)}
-            title={`Switch the chart to ${group.timeframe}`}
-          >
-            <LineChart className="h-3 w-3" />
-            Show on chart
-          </button>
-        )}
       </div>
       {group.patterns.map((pattern) => (
         <PatternRow key={pattern.id} pattern={pattern} {...row} />

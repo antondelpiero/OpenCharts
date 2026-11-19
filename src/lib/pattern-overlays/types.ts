@@ -45,6 +45,7 @@ export interface MappedPattern {
 
 /** Chart context a mapper may need, e.g. to project targets past the last candle. */
 export interface MapContext {
+  /** The charted timeframe: its bar length spaces projections past the last candle. */
   timeframe: string;
   /** Open time (unix seconds) of the newest candle on the chart, if loaded. */
   lastBarSec: number | null;

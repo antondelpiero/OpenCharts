@@ -338,13 +338,11 @@ export function TradingPage() {
               <PatternsPanel
                 symbol={selectedSymbol}
                 patterns={allPatterns}
-                timeframe={timeframe}
                 leadingTimeframe={leadingPatternTimeframe}
                 hiddenIds={hiddenPatternIds}
                 loading={patternsLoading}
                 unavailable={patternsUnavailable}
                 onToggle={togglePattern}
-                onShowTimeframe={handleTimeframeChange}
                 expired={{
                   patterns: expiredPatterns,
                   open: expiredPatternsOpen,

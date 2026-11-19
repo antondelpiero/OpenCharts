@@ -325,17 +325,18 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const lastBarSec = candles.length > 0 ? (candles[candles.length - 1]!.time as number) : null;
   const {
     overlays: patterns,
+    timeframe: patternTimeframe,
     allOverlays: allPatterns,
     isLoading: patternsLoading,
     error: patternsError,
   } = usePatternOverlays(selectedSymbol, timeframe, lastBarSec, isDark);
-  // The timeframe listed first in the patterns panel: the charted one when it
-  // has patterns, otherwise the last charted one that did (switching to a
-  // timeframe without detections keeps the previous one on top). Adjusted
-  // during render, React's pattern for state derived from changing inputs.
+  // The timeframe listed first in the patterns panel: the one drawn on the
+  // chart (the charted one, or the larger one standing in for it); with none,
+  // the last one drawn stays on top. Adjusted during render, React's pattern
+  // for state derived from changing inputs.
   const [leadingPatternTimeframe, setLeadingPatternTimeframe] = useState<string | null>(null);
-  if (leadingPatternTimeframe !== timeframe && allPatterns.some((p) => p.timeframe === timeframe)) {
-    setLeadingPatternTimeframe(timeframe);
+  if (patternTimeframe !== null && leadingPatternTimeframe !== patternTimeframe) {
+    setLeadingPatternTimeframe(patternTimeframe);
   }
   // Expired analyses: fetched (paginated) only once the panel's "Expired"
   // section has been opened.
@@ -362,14 +363,16 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     }
     return hidden;
   }, [allPatterns, expiredPatterns, toggledPatternIds]);
-  // On the chart (legend, popup, drawings): the charted timeframe's active
-  // patterns plus any expired ones of that timeframe the user switched on.
+  // On the chart (legend, popup, drawings): the drawn timeframe's active
+  // patterns plus any expired ones of the charted or drawn timeframe the user switched on.
   const chartPatterns = useMemo(
     () => [
       ...patterns,
-      ...expiredPatterns.filter((p) => p.timeframe === timeframe && !hiddenPatternIds.has(p.id)),
+      ...expiredPatterns.filter(
+        (p) => (p.timeframe === timeframe || p.timeframe === patternTimeframe) && !hiddenPatternIds.has(p.id),
+      ),
     ],
-    [patterns, expiredPatterns, timeframe, hiddenPatternIds],
+    [patterns, expiredPatterns, timeframe, patternTimeframe, hiddenPatternIds],
   );
   const patternOverlays = useMemo(
     () => chartPatterns.filter((p) => !hiddenPatternIds.has(p.id)).flatMap((p) => p.drawings),
@@ -539,6 +542,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     expiredPatternsLoadingMore: history.isLoadingMore,
     loadMoreExpiredPatterns: history.loadMore,
     leadingPatternTimeframe,
+    patternTimeframe,
     patternsLoading,
     patternsUnavailable: patternsError !== null,
     patternOverlays,
