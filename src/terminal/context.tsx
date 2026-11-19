@@ -364,15 +364,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     return hidden;
   }, [allPatterns, expiredPatterns, toggledPatternIds]);
   // On the chart (legend, popup, drawings): the drawn timeframe's active
-  // patterns plus any expired ones of the charted or drawn timeframe the user switched on.
+  // patterns plus every expired one the user switched on, whatever its
+  // timeframe (switching one on is an explicit request to see it).
   const chartPatterns = useMemo(
-    () => [
-      ...patterns,
-      ...expiredPatterns.filter(
-        (p) => (p.timeframe === timeframe || p.timeframe === patternTimeframe) && !hiddenPatternIds.has(p.id),
-      ),
-    ],
-    [patterns, expiredPatterns, timeframe, patternTimeframe, hiddenPatternIds],
+    () => [...patterns, ...expiredPatterns.filter((p) => !hiddenPatternIds.has(p.id))],
+    [patterns, expiredPatterns, hiddenPatternIds],
   );
   const patternOverlays = useMemo(
     () => chartPatterns.filter((p) => !hiddenPatternIds.has(p.id)).flatMap((p) => p.drawings),
