@@ -1,6 +1,7 @@
 import type { PairAnalysis, PatternResult } from "../../services/analysis";
 import { elliottPattern } from "./elliott";
 import { fibonacciDrawing, fibonacciLevels } from "./fibonacci";
+import { rangePattern } from "./range";
 import type { MapContext, MappedPattern, PatternOverlay } from "./types";
 
 export type { PatternLevel, PatternOverlay } from "./types";
@@ -15,6 +16,7 @@ const MAPPERS: Record<
     return drawing ? { drawings: [drawing], levels: fibonacciLevels(drawing), name: "Fibonacci" } : null;
   },
   ELLIOT_WAVE: elliottPattern,
+  RANGE: rangePattern,
 };
 
 /**

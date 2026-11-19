@@ -1,6 +1,16 @@
 import { TF_INTERVAL_MS, type DrawingLine, type Timeframe } from "../../pages/trading/constants";
 import type { PatternResult } from "../../services/analysis";
-import { toUnixSeconds } from "./fibonacci";
+import {
+  DIRECTION_COLOR,
+  DIRECTION_LABEL_DARK,
+  PROJECT_GAP_BARS,
+  PROJECT_WIDTH_BARS,
+  finite,
+  label,
+  point,
+  withHalo,
+  type Point,
+} from "./style";
 import type { MapContext, MappedPattern, PatternLevel } from "./types";
 
 /**
@@ -17,60 +27,18 @@ import type { MapContext, MappedPattern, PatternLevel } from "./types";
  *   key a single level, both projected into the space right of the last candle.
  */
 
-/** Colour follows direction; degree sets the line weight (outer count heavier). */
-const DIRECTION_COLOR = { bullish: "#16623a", bearish: "#881f1f" } as const;
-/** Label text on the dark theme: the line colours are too dark to read there. */
-const DIRECTION_LABEL_DARK = { bullish: "#5cbf86", bearish: "#e06666" } as const;
 const DEGREE_STYLE: Record<string, { width: number; zIndex: number }> = {
   primary: { width: 3.5, zIndex: 1 },
   intermediate: { width: 2.5, zIndex: 2 },
 };
 const OTHER_DEGREE = { width: 2, zIndex: 3 };
 
-/**
- * A wider, semi-transparent outline drawn under each coloured line, so the
- * waves separate from the red/green candles beneath them: whitish on the dark
- * theme, dark grey on the light one.
- */
-const HALO_COLOR = { dark: "rgba(255, 255, 255, 0.5)", light: "rgba(17, 24, 39, 0.6)" } as const;
-const HALO_EXTRA_WIDTH = 3.5;
-
-/** `line` preceded by its outline (drawings render in list order, so it sits beneath). */
-function withHalo(line: DrawingLine, isDark: boolean): DrawingLine[] {
-  const halo: DrawingLine = {
-    ...line,
-    id: `${line.id}:halo`,
-    color: isDark ? HALO_COLOR.dark : HALO_COLOR.light,
-    width: (line.width ?? 1.5) + HALO_EXTRA_WIDTH,
-    lineStyle: "solid",
-  };
-  return [halo, line];
-}
 const INVALIDATION_COLOR = "#ef4444";
-/** Wave-label background boxes, matched to the chart theme. */
-const LABEL_BG = { dark: "#1e222d", light: "#ffffff" } as const;
-
-/** Targets are drawn this many bars past the last candle, this many bars wide. */
-const PROJECT_GAP_BARS = 5;
-const PROJECT_WIDTH_BARS = 10;
-
-interface Point {
-  timeSec: number;
-  price: number;
-}
-
 interface Wave {
   key: string;
   start: Point;
   end: Point;
   forming: boolean;
-}
-
-const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
-
-function point(timestamp: unknown, price: unknown): Point | null {
-  const timeSec = toUnixSeconds(timestamp);
-  return timeSec !== null && finite(price) ? { timeSec, price } : null;
 }
 
 function readWaves(structure: unknown): Wave[] {
@@ -104,33 +72,6 @@ export function waveLabel(key: string): string | null {
 function humanizeKey(key: string): string {
   const words = key.replace(/_(min|max)$/, "").split("_");
   return words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(" ");
-}
-
-/**
- * A text label whose top-left corner sits at `at`. Wave labels get a background
- * box for legibility over candles; target labels don't, so the text sits just
- * under its level instead of covering it.
- */
-function label(
-  id: string,
-  text: string,
-  at: Point,
-  color: string,
-  isDark: boolean,
-  boxed = true,
-): DrawingLine {
-  return {
-    id,
-    type: "text",
-    time: at.timeSec,
-    price: at.price,
-    text,
-    color,
-    fontSize: 11,
-    textBg: boxed,
-    textBgColor: isDark ? LABEL_BG.dark : LABEL_BG.light,
-    locked: true,
-  };
 }
 
 interface Projected {
