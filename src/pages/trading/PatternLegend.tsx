@@ -55,6 +55,7 @@ export function PatternLegend({ patterns, hiddenIds, onToggle, onSelect }: Legen
               {pattern.confidence != null && (
                 <span className="ml-1 text-muted-foreground">{percent(pattern.confidence)}</span>
               )}
+              {pattern.expired && <span className="ml-1 text-muted-foreground">expired</span>}
             </span>
             <button
               onClick={(e) => {
@@ -95,7 +96,7 @@ export function PatternDetails({ pattern }: { pattern: PatternOverlay }) {
   }
   if (pattern.confidence != null) rows.push(["Confidence", percent(pattern.confidence)]);
   if (pattern.patternState) rows.push(["State", humanize(pattern.patternState)]);
-  rows.push(["Valid until", new Date(pattern.expiresAt).toLocaleString()]);
+  rows.push([pattern.expired ? "Expired at" : "Valid until", new Date(pattern.expiresAt).toLocaleString()]);
 
   return (
     <>

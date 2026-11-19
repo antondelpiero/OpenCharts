@@ -2,14 +2,26 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, Eye, EyeOff, LineChart } from "lucide-react";
 import type { PatternOverlay } from "../../lib/pattern-overlays";
 import { capitalize, directionClass, humanize, percent } from "../../lib/pattern-overlays/format";
+import { groupByTimeframe, type TimeframeGroup } from "../../lib/pattern-overlays/group";
 import { cn } from "../../lib/utils.ts";
-import { groupByTimeframe } from "../../lib/pattern-overlays/group";
 import type { Timeframe } from "./constants";
 import { PatternDetails } from "./PatternLegend.tsx";
 
+interface ExpiredSection {
+  /** Expired analyses loaded so far, all timeframes. */
+  patterns: PatternOverlay[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  loading: boolean;
+  unavailable: boolean;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+}
+
 interface PatternsPanelProps {
   symbol: string;
-  /** Every detected pattern for the symbol, across all timeframes. */
+  /** Every currently valid pattern for the symbol, across all timeframes. */
   patterns: PatternOverlay[];
   /** The timeframe the chart is showing. */
   timeframe: Timeframe;
@@ -22,21 +34,23 @@ interface PatternsPanelProps {
   onToggle: (id: string) => void;
   /** Switch the chart to a pattern's timeframe. */
   onShowTimeframe: (timeframe: Timeframe) => void;
+  expired: ExpiredSection;
 }
 
-/** "in 7h", "in 25m" until an ISO timestamp. */
-function expiresIn(iso: string): string {
+/** "in 7h" / "3h ago" relative to now. */
+function relativeTime(iso: string): string {
   const mins = Math.round((Date.parse(iso) - Date.now()) / 60_000);
-  if (mins <= 0) return "expired";
-  if (mins < 60) return `in ${mins}m`;
-  const hours = Math.round(mins / 60);
-  return hours < 48 ? `in ${hours}h` : `in ${Math.round(hours / 24)}d`;
+  const abs = Math.abs(mins);
+  const span = abs < 60 ? `${abs}m` : abs < 48 * 60 ? `${Math.round(abs / 60)}h` : `${Math.round(abs / 1440)}d`;
+  return mins > 0 ? `in ${span}` : `${span} ago`;
 }
 
 /**
  * Right-panel list of everything the trading backend detected for the symbol,
- * grouped by timeframe, the one being looked at first. A row expands to the same details as the chart popup;
- * patterns on another timeframe can be brought onto the chart from here.
+ * grouped by timeframe, the one being looked at first. A row expands to the
+ * same details as the chart popup; patterns on another timeframe can be
+ * brought onto the chart from here. Expired analyses sit in a collapsed
+ * section at the bottom, loaded page by page when opened.
  */
 export function PatternsPanel({
   symbol,
@@ -48,10 +62,17 @@ export function PatternsPanel({
   unavailable,
   onToggle,
   onShowTimeframe,
+  expired,
 }: PatternsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
-
-  const groups = groupByTimeframe(patterns, leadingTimeframe);
+  const rowProps = {
+    timeframe,
+    hiddenIds,
+    expanded,
+    onExpand: setExpanded,
+    onToggle,
+    onShowTimeframe,
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -75,82 +96,141 @@ export function PatternsPanel({
             timeframe, so this list fills again after the next run.
           </p>
         ) : (
-          groups.map((group) => {
-            const onChart = group.timeframe === timeframe;
-            return (
-              <section key={group.timeframe} className="border-b border-border">
-                <div className="flex items-center justify-between px-3 py-1.5 bg-card sticky top-0 z-10">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider">{group.timeframe}</span>
-                  {onChart ? (
-                    <span className="text-[10px] text-primary">on chart</span>
-                  ) : (
+          groupByTimeframe(patterns, leadingTimeframe).map((group) => (
+            <GroupSection key={group.timeframe} group={group} {...rowProps} />
+          ))
+        )}
+
+        {!unavailable && (
+          <section className="border-t border-border mt-2">
+            <button
+              className="w-full flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+              onClick={() => expired.onOpenChange(!expired.open)}
+            >
+              {expired.open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              Expired
+              {expired.patterns.length > 0 && (
+                <span className="font-normal normal-case tracking-normal">
+                  ({expired.patterns.length}
+                  {expired.hasMore ? "+" : ""})
+                </span>
+              )}
+            </button>
+
+            {expired.open &&
+              (expired.loading ? (
+                <p className="px-3 pb-3 text-xs text-muted-foreground">Loading history…</p>
+              ) : expired.unavailable ? (
+                <p className="px-3 pb-3 text-xs text-muted-foreground">History is not reachable right now.</p>
+              ) : expired.patterns.length === 0 && !expired.hasMore ? (
+                <p className="px-3 pb-3 text-xs text-muted-foreground">No expired analyses.</p>
+              ) : (
+                <div className="opacity-90">
+                  <p className="px-3 pb-1.5 text-[10px] text-muted-foreground">
+                    Hidden on the chart by default; drawn grey and dashed when shown.
+                  </p>
+                  {groupByTimeframe(expired.patterns, leadingTimeframe).map((group) => (
+                    <GroupSection key={group.timeframe} group={group} {...rowProps} />
+                  ))}
+                  {expired.hasMore && (
                     <button
-                      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
-                      onClick={() => onShowTimeframe(group.timeframe as Timeframe)}
-                      title={`Switch the chart to ${group.timeframe}`}
+                      className="w-full py-2 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      onClick={expired.onLoadMore}
+                      disabled={expired.loadingMore}
                     >
-                      <LineChart className="h-3 w-3" />
-                      Show on chart
+                      {expired.loadingMore ? "Loading…" : "Load more"}
                     </button>
                   )}
                 </div>
-
-                {group.patterns.map((pattern) => {
-                  const hidden = hiddenIds.has(pattern.id);
-                  const open = expanded === pattern.id;
-                  return (
-                    <div key={pattern.id} className={cn("px-3", hidden && "opacity-50")}>
-                      <div
-                        className="flex items-center gap-1.5 py-1.5 cursor-pointer"
-                        onClick={() => setExpanded(open ? null : pattern.id)}
-                      >
-                        {open ? (
-                          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs truncate">{pattern.name}</div>
-                          <div className="text-[10px] text-muted-foreground truncate">
-                            {pattern.direction && (
-                              <span className={directionClass(pattern.direction)}>
-                                {capitalize(pattern.direction)}
-                              </span>
-                            )}
-                            {pattern.confidence != null && <> · {percent(pattern.confidence)}</>}
-                            {pattern.patternState && <> · {humanize(pattern.patternState)}</>}
-                            <> · expires {expiresIn(pattern.expiresAt)}</>
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggle(pattern.id);
-                          }}
-                          className="text-muted-foreground hover:text-foreground"
-                          title={hidden ? "Show" : "Hide"}
-                        >
-                          {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-                      {open && (
-                        <div className="pb-2.5 pl-5 text-xs">
-                          {pattern.patternType && (
-                            <div className="mb-1.5 text-[10px] font-mono text-muted-foreground">
-                              {pattern.patternType}
-                            </div>
-                          )}
-                          <PatternDetails pattern={pattern} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </section>
-            );
-          })
+              ))}
+          </section>
         )}
       </div>
+    </div>
+  );
+}
+
+interface RowProps {
+  timeframe: Timeframe;
+  hiddenIds: ReadonlySet<string>;
+  expanded: string | null;
+  onExpand: (id: string | null) => void;
+  onToggle: (id: string) => void;
+  onShowTimeframe: (timeframe: Timeframe) => void;
+}
+
+/** One timeframe's header ("on chart" / "Show on chart") and its pattern rows. */
+function GroupSection({ group, ...row }: RowProps & { group: TimeframeGroup }) {
+  const onChart = group.timeframe === row.timeframe;
+  return (
+    <section className="border-b border-border">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-card sticky top-0 z-10">
+        <span className="text-[11px] font-semibold uppercase tracking-wider">{group.timeframe}</span>
+        {onChart ? (
+          <span className="text-[10px] text-primary">on chart</span>
+        ) : (
+          <button
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+            onClick={() => row.onShowTimeframe(group.timeframe as Timeframe)}
+            title={`Switch the chart to ${group.timeframe}`}
+          >
+            <LineChart className="h-3 w-3" />
+            Show on chart
+          </button>
+        )}
+      </div>
+      {group.patterns.map((pattern) => (
+        <PatternRow key={pattern.id} pattern={pattern} {...row} />
+      ))}
+    </section>
+  );
+}
+
+/** A pattern's summary line; expands to its full details. */
+function PatternRow({ pattern, hiddenIds, expanded, onExpand, onToggle }: RowProps & { pattern: PatternOverlay }) {
+  const hidden = hiddenIds.has(pattern.id);
+  const open = expanded === pattern.id;
+  return (
+    <div className={cn("px-3", hidden && "opacity-50")}>
+      <div className="flex items-center gap-1.5 py-1.5 cursor-pointer" onClick={() => onExpand(open ? null : pattern.id)}>
+        {open ? (
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs truncate">{pattern.name}</div>
+          <div className="text-[10px] text-muted-foreground truncate">
+            {pattern.direction && (
+              <span className={directionClass(pattern.direction)}>{capitalize(pattern.direction)}</span>
+            )}
+            {pattern.confidence != null && <> · {percent(pattern.confidence)}</>}
+            {pattern.patternState && <> · {humanize(pattern.patternState)}</>}
+            <>
+              {" "}
+              · {pattern.expired ? "expired" : "expires"} {relativeTime(pattern.expiresAt)}
+            </>
+          </div>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(pattern.id);
+          }}
+          className="text-muted-foreground hover:text-foreground"
+          title={hidden ? "Show" : "Hide"}
+        >
+          {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      {open && (
+        <div className="pb-2.5 pl-5 text-xs">
+          {pattern.patternType && (
+            <div className="mb-1.5 text-[10px] font-mono text-muted-foreground">{pattern.patternType}</div>
+          )}
+          <PatternDetails pattern={pattern} />
+        </div>
+      )}
     </div>
   );
 }

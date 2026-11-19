@@ -73,6 +73,18 @@ export interface TerminalContextValue {
   drawings: DrawingLine[];
   /** Detected patterns (read-only analysis) for the charted symbol and timeframe. */
   patterns: PatternOverlay[];
+  /** What the chart shows: `patterns` plus expired ones of this timeframe switched on. */
+  chartPatterns: PatternOverlay[];
+  /** Expired analyses loaded so far (all timeframes), hidden on the chart by default. */
+  expiredPatterns: PatternOverlay[];
+  /** The panel's "Expired" section is open; history is fetched only then. */
+  expiredPatternsOpen: boolean;
+  setExpiredPatternsOpen: (open: boolean) => void;
+  expiredPatternsLoading: boolean;
+  expiredPatternsUnavailable: boolean;
+  expiredPatternsHasMore: boolean;
+  expiredPatternsLoadingMore: boolean;
+  loadMoreExpiredPatterns: () => void;
   /** Detected patterns across every timeframe of the symbol (patterns panel). */
   allPatterns: PatternOverlay[];
   /** Timeframe the patterns panel lists first (charted one, or last charted one with patterns). */

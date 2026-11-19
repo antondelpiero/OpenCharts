@@ -12,6 +12,7 @@ import {
   PositionModifyDialog,
 } from "../components/TradingDialogs.tsx";
 import { useChartDrawings } from "../hooks/useChartDrawings.ts";
+import { usePatternHistory } from "../hooks/usePatternHistory.ts";
 import { usePatternOverlays } from "../hooks/usePatternOverlays.ts";
 import {
   getChartPreferencesFromStorage,
@@ -336,20 +337,43 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   if (leadingPatternTimeframe !== timeframe && allPatterns.some((p) => p.timeframe === timeframe)) {
     setLeadingPatternTimeframe(timeframe);
   }
-  // Hidden patterns (session only). Ids are per analysis, so a newly run
-  // analysis shows again even if the previous one was hidden.
-  const [hiddenPatternIds, setHiddenPatternIds] = useState<ReadonlySet<string>>(() => new Set());
+  // Expired analyses: fetched (paginated) only once the panel's "Expired"
+  // section has been opened.
+  const [expiredPatternsOpen, setExpiredPatternsOpen] = useState(false);
+  const history = usePatternHistory(selectedSymbol, isDark, expiredPatternsOpen);
+  const expiredPatterns = history.expired;
+
+  // Visibility (session only): active patterns show by default, expired ones
+  // are hidden by default; the eye flips a pattern from its default. Ids are
+  // per analysis, so a newly run analysis starts from its default again.
+  const [toggledPatternIds, setToggledPatternIds] = useState<ReadonlySet<string>>(() => new Set());
   const togglePattern = useCallback((id: string) => {
-    setHiddenPatternIds((prev) => {
+    setToggledPatternIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
   }, []);
+  const hiddenPatternIds = useMemo<ReadonlySet<string>>(() => {
+    const hidden = new Set<string>();
+    for (const p of [...allPatterns, ...expiredPatterns]) {
+      if (p.expired !== toggledPatternIds.has(p.id)) hidden.add(p.id);
+    }
+    return hidden;
+  }, [allPatterns, expiredPatterns, toggledPatternIds]);
+  // On the chart (legend, popup, drawings): the charted timeframe's active
+  // patterns plus any expired ones of that timeframe the user switched on.
+  const chartPatterns = useMemo(
+    () => [
+      ...patterns,
+      ...expiredPatterns.filter((p) => p.timeframe === timeframe && !hiddenPatternIds.has(p.id)),
+    ],
+    [patterns, expiredPatterns, timeframe, hiddenPatternIds],
+  );
   const patternOverlays = useMemo(
-    () => patterns.filter((p) => !hiddenPatternIds.has(p.id)).flatMap((p) => p.drawings),
-    [patterns, hiddenPatternIds],
+    () => chartPatterns.filter((p) => !hiddenPatternIds.has(p.id)).flatMap((p) => p.drawings),
+    [chartPatterns, hiddenPatternIds],
   );
   const { replayCandles, replayTradeEvents } = useReplayChartData(activeAccountId);
   useReplayPlayback(activeAccountId ?? "");
@@ -504,7 +528,16 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     setDrawingTool,
     drawings,
     patterns,
+    chartPatterns,
     allPatterns,
+    expiredPatterns,
+    expiredPatternsOpen,
+    setExpiredPatternsOpen,
+    expiredPatternsLoading: history.isLoading,
+    expiredPatternsUnavailable: history.error !== null,
+    expiredPatternsHasMore: history.hasMore,
+    expiredPatternsLoadingMore: history.isLoadingMore,
+    loadMoreExpiredPatterns: history.loadMore,
     leadingPatternTimeframe,
     patternsLoading,
     patternsUnavailable: patternsError !== null,

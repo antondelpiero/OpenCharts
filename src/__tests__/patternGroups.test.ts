@@ -12,6 +12,7 @@ const p = (timeframe: string, id = timeframe): PatternOverlay => ({
   confidence: null,
   patternState: null,
   expiresAt: "2026-11-19T00:00:00Z",
+  expired: false,
   levels: [],
   note: null,
   drawings: [],

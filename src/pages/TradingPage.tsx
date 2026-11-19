@@ -61,8 +61,16 @@ export function TradingPage() {
     drawingTool,
     setDrawingTool,
     drawings,
-    patterns,
+    chartPatterns,
     allPatterns,
+    expiredPatterns,
+    expiredPatternsOpen,
+    setExpiredPatternsOpen,
+    expiredPatternsLoading,
+    expiredPatternsUnavailable,
+    expiredPatternsHasMore,
+    expiredPatternsLoadingMore,
+    loadMoreExpiredPatterns,
     leadingPatternTimeframe,
     patternsLoading,
     patternsUnavailable,
@@ -224,7 +232,7 @@ export function TradingPage() {
               drawingTool={drawingTool}
               drawings={drawings}
               overlays={patternOverlays}
-              patterns={patterns}
+              patterns={chartPatterns}
               hiddenPatternIds={hiddenPatternIds}
               onTogglePattern={togglePattern}
               onAddDrawing={addDrawing}
@@ -337,6 +345,16 @@ export function TradingPage() {
                 unavailable={patternsUnavailable}
                 onToggle={togglePattern}
                 onShowTimeframe={handleTimeframeChange}
+                expired={{
+                  patterns: expiredPatterns,
+                  open: expiredPatternsOpen,
+                  onOpenChange: setExpiredPatternsOpen,
+                  loading: expiredPatternsLoading,
+                  unavailable: expiredPatternsUnavailable,
+                  hasMore: expiredPatternsHasMore,
+                  loadingMore: expiredPatternsLoadingMore,
+                  onLoadMore: loadMoreExpiredPatterns,
+                }}
               />
             )}
             {rightPanel === "tv-analysis" && (

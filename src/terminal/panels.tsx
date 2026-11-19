@@ -30,7 +30,7 @@ export function Chart() {
       drawingTool={t.drawingTool}
       drawings={t.drawings}
       overlays={t.patternOverlays}
-      patterns={t.patterns}
+      patterns={t.chartPatterns}
       hiddenPatternIds={t.hiddenPatternIds}
       onTogglePattern={t.togglePattern}
       onAddDrawing={t.addDrawing}

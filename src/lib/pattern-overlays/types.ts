@@ -24,6 +24,8 @@ export interface PatternOverlay {
   patternState: string | null;
   /** ISO timestamp the analysis is valid until. */
   expiresAt: string;
+  /** Past its validity (from the analysis history); drawn dimmed, hidden by default. */
+  expired: boolean;
   /** Key prices for the info popup, top to bottom as a trader reads them. */
   levels: PatternLevel[];
   /** The analyzer's plain-language expectation, when it gives one. */

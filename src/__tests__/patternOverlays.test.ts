@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ANALYZER_FIB_LEVELS, fibonacciDrawing, fibonacciLevels, toUnixSeconds } from "../lib/pattern-overlays/fibonacci";
-import { toOverlays } from "../lib/pattern-overlays";
+import { toExpiredOverlays, toOverlays } from "../lib/pattern-overlays";
 import type { PairAnalysis } from "../services/analysis";
 
 const sec = (iso: string) => Date.parse(iso) / 1000;
@@ -153,5 +153,36 @@ describe("toOverlays", () => {
 
   it("returns nothing for no data", () => {
     expect(toOverlays([], "1d")).toEqual([]);
+  });
+});
+
+describe("toExpiredOverlays", () => {
+  const now = Date.parse("2026-11-18T17:00:00Z");
+  const expired1 = entry({ expiresAt: "2026-11-18T13:18:00Z", timeframe: "4h" });
+  const expired2 = entry({ expiresAt: "2026-11-17T14:04:00Z", timeframe: "4h", analysis: [bearish] });
+  const valid = entry({ expiresAt: "2026-11-19T00:30:57.057Z" });
+
+  it("keeps only expired entries, every run of them", () => {
+    const overlays = toExpiredOverlays([valid, expired1, expired2], true, now);
+    expect(overlays.map((o) => o.expiresAt)).toEqual([expired1.expiresAt, expired2.expiresAt]);
+    expect(overlays.every((o) => o.expired)).toBe(true);
+  });
+
+  it("dims an expired fib to grey dashed level lines at the right prices", () => {
+    const [overlay] = toExpiredOverlays([expired2], true, now); // bearish fib
+    const lines = overlay!.drawings.filter((d) => d.type === "trendline");
+    expect(overlay!.drawings.some((d) => d.type === "fibonacci")).toBe(false);
+    expect(lines).toHaveLength(10);
+    expect(lines.every((l) => l.color === "#8a8f98" && l.lineStyle === "dashed" && l.extendRight)).toBe(true);
+    const at = (level: number) => lines.find((l) => l.id.endsWith(`:level:${level}`))!.price;
+    expect(at(1)).toBeCloseTo(85643.2, 1); // stop
+    expect(at(0)).toBeCloseTo(61956.3, 1); // target 1
+    expect(overlay!.drawings.some((d) => d.id.endsWith(":halo"))).toBe(false);
+  });
+
+  it("leaves live overlays untouched", () => {
+    const [live] = toOverlays([valid], "1d");
+    expect(live!.expired).toBe(false);
+    expect(live!.drawings[0]!.color).toBe("#2196F3");
   });
 });

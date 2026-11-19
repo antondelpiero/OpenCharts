@@ -36,3 +36,41 @@ export async function getPairAnalyses(pair: string, signal?: AbortSignal): Promi
   const body = (await res.json()) as AnalyzeResponse;
   return Array.isArray(body.data) ? body.data : [];
 }
+
+export interface AnalysisPagination {
+  limit: number;
+  offset: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface AnalysisHistoryPage {
+  entries: PairAnalysis[];
+  pagination: AnalysisPagination;
+}
+
+/** Page size for the analysis history (trading-api's default). */
+export const HISTORY_PAGE_SIZE = 50;
+
+/**
+ * Every completed analysis for the pair, valid and expired, newest first, one
+ * page at a time (`GET /api/analyze/{pair}?includeExpired=true&limit&offset`).
+ */
+export async function getPairAnalysisHistory(
+  pair: string,
+  offset: number,
+  signal?: AbortSignal,
+): Promise<AnalysisHistoryPage> {
+  const qs = new URLSearchParams({
+    includeExpired: "true",
+    limit: String(HISTORY_PAGE_SIZE),
+    offset: String(offset),
+  });
+  const res = await fetch(`/api/analyze/${encodeURIComponent(pair)}?${qs}`, { signal });
+  if (!res.ok) throw new Error(`GET /api/analyze/${pair} (history) failed: HTTP ${res.status}`);
+  const body = (await res.json()) as AnalyzeResponse & { pagination?: AnalysisPagination };
+  return {
+    entries: Array.isArray(body.data) ? body.data : [],
+    pagination: body.pagination ?? { limit: HISTORY_PAGE_SIZE, offset, total: 0, hasMore: false },
+  };
+}
