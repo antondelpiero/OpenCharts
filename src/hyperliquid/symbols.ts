@@ -71,7 +71,11 @@ export function priceTickSize(price: number | undefined, szDecimals: number): nu
     price !== undefined && price > 0
       ? allowedPriceDecimals(price, szDecimals)
       : Math.max(0, HL_MAX_PERP_DECIMALS - szDecimals);
-  return 10 ** -decimals;
+  // Parse the decimal literal rather than computing `10 ** -decimals`: in V8 the
+  // exponentiation is off by an ulp for some exponents (10 ** -4 gives
+  // 0.00009999999999999999), which leaks into tick sizes shown and used for
+  // validation. Parsing "1e-4" yields the nearest double, i.e. exactly 0.0001.
+  return Number(`1e-${decimals}`);
 }
 
 /** Round `price` to the nearest multiple of `tick` (float-noise free). */

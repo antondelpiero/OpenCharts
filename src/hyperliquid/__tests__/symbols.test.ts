@@ -86,6 +86,12 @@ describe("tick size", () => {
     expect(priceTickSize(0.00012345, 0)).toBe(1e-6); // capped by 6 decimals
     expect(priceTickSize(1.1167, 4)).toBe(0.01); // capped by 6 - szDecimals
   });
+  it("returns exact powers of ten, without float noise, for every decimal count", () => {
+    // 10 ** -4 and 10 ** -5 are off by an ulp in V8; the tick must be the exact literal.
+    expect([6, 5, 4, 3, 2, 1, 0].map((sz) => priceTickSize(undefined, sz))).toEqual([
+      1, 0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001,
+    ]);
+  });
   it("falls back to the decimal cap with no price", () => {
     expect(priceTickSize(undefined, 3)).toBe(0.001);
   });
