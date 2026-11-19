@@ -1,4 +1,3 @@
-import type { DrawingLine } from "../../pages/trading/constants";
 import type { PairAnalysis, PatternResult } from "../../services/analysis";
 import { elliottPattern } from "./elliott";
 import { fibonacciDrawing, fibonacciLevels } from "./fibonacci";
@@ -61,63 +60,10 @@ function mapEntry(entry: PairAnalysis, ctx: MapContext, expired: boolean): Patte
       expired,
       levels: mapped.levels,
       note: mapped.note ?? null,
-      drawings: expired ? dimmed(mapped.drawings) : mapped.drawings,
+      drawings: mapped.drawings,
     });
   });
   return overlays;
-}
-
-/** Neutral grey for expired analyses, so they never read as a live one. */
-const EXPIRED_COLOR = "#8a8f98";
-
-/**
- * Expired look: grey, dashed lines, no outline. A fib is re-drawn as plain
- * level lines, because the fib renderer colours its levels from a fixed
- * palette and ignores the drawing's colour and line style.
- */
-function dimmed(drawings: DrawingLine[]): DrawingLine[] {
-  return drawings
-    .filter((d) => !d.id.endsWith(":halo"))
-    .flatMap((d) =>
-      d.type === "fibonacci"
-        ? fibAsLevelLines(d)
-        : [{ ...d, color: EXPIRED_COLOR, ...(d.type === "text" ? {} : { lineStyle: "dashed" as const }) }],
-    );
-}
-
-/** A fib's levels as grey dashed lines (from the swing, extended right) with labels. */
-function fibAsLevelLines(d: DrawingLine): DrawingLine[] {
-  if (d.price2 == null || d.time == null || d.time2 == null) return [];
-  const left = Math.min(d.time, d.time2);
-  const right = Math.max(d.time, d.time2);
-  return (d.fibLevels ?? []).flatMap((level) => {
-    const price = d.price2! + (d.price - d.price2!) * level;
-    return [
-      {
-        id: `${d.id}:level:${level}`,
-        type: "trendline" as const,
-        time: left,
-        price,
-        time2: right,
-        price2: price,
-        extendRight: d.extendRight,
-        color: EXPIRED_COLOR,
-        width: 1,
-        lineStyle: "dashed" as const,
-        locked: true,
-      },
-      {
-        id: `${d.id}:level:${level}:label`,
-        type: "text" as const,
-        time: left,
-        price,
-        text: String(level),
-        color: EXPIRED_COLOR,
-        fontSize: 10,
-        locked: true,
-      },
-    ];
-  });
 }
 
 /**
@@ -140,7 +86,7 @@ export function toOverlays(
 /**
  * Expired analyses from the history listing, every run kept (it is a history,
  * not "the latest"). Targets are not projected: the chart's last candle has
- * moved on since they were made. Drawings are dimmed.
+ * moved on since they were made. Drawn exactly like live patterns.
  */
 export function toExpiredOverlays(
   entries: PairAnalysis[],

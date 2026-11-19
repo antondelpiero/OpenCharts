@@ -168,16 +168,11 @@ describe("toExpiredOverlays", () => {
     expect(overlays.every((o) => o.expired)).toBe(true);
   });
 
-  it("dims an expired fib to grey dashed level lines at the right prices", () => {
+  it("draws an expired fib like a live one", () => {
     const [overlay] = toExpiredOverlays([expired2], true, now); // bearish fib
-    const lines = overlay!.drawings.filter((d) => d.type === "trendline");
-    expect(overlay!.drawings.some((d) => d.type === "fibonacci")).toBe(false);
-    expect(lines).toHaveLength(10);
-    expect(lines.every((l) => l.color === "#8a8f98" && l.lineStyle === "dashed" && l.extendRight)).toBe(true);
-    const at = (level: number) => lines.find((l) => l.id.endsWith(`:level:${level}`))!.price;
-    expect(at(1)).toBeCloseTo(85643.2, 1); // stop
-    expect(at(0)).toBeCloseTo(61956.3, 1); // target 1
-    expect(overlay!.drawings.some((d) => d.id.endsWith(":halo"))).toBe(false);
+    const [live] = toOverlays([{ ...expired2, expiresAt: "2026-11-19T00:30:57.057Z" }], "4h");
+    expect(overlay!.drawings.map((d) => ({ ...d, id: "" }))).toEqual(live!.drawings.map((d) => ({ ...d, id: "" })));
+    expect(overlay!.drawings.some((d) => d.type === "fibonacci")).toBe(true);
   });
 
   it("leaves live overlays untouched", () => {

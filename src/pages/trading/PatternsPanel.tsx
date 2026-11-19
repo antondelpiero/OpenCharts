@@ -127,7 +127,7 @@ export function PatternsPanel({
               ) : (
                 <div className="opacity-90">
                   <p className="px-3 pb-1.5 text-[10px] text-muted-foreground">
-                    Hidden on the chart by default; drawn grey and dashed when shown.
+                    Hidden on the chart by default; use the eye to show one.
                   </p>
                   {groupByTimeframe(expired.patterns, leadingTimeframe).map((group) => (
                     <GroupSection key={group.timeframe} group={group} {...rowProps} />
